@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0b0f14;
+  --panel: #121821;
+  --panel-2: #172030;
+  --line: #223047;
+  --text: #e6edf6;
+  --muted: #8b9bb4;
+  --accent: #4da3ff;
+  --warn: #f2b544;
+  --danger: #ff6b6b;
+  --ok: #4ade80;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+}
+
+.chip-pending {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+}
+.chip-published {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+}
+.chip-rejected {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.chip-curated {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.chip-computed {
+  color: var(--muted);
+}
+
+table.rank {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+table.rank th {
+  text-align: right;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+table.rank th:first-child,
+table.rank td:first-child {
+  text-align: left;
+}
+table.rank td {
+  text-align: right;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+table.rank tr:hover td {
+  background: var(--panel-2);
+}
+
+.narrative h3,
+.narrative h2 {
+  font-weight: 650;
+  margin: 1.15rem 0 0.4rem;
+  color: var(--text);
+}
+.narrative p {
+  margin: 0.55rem 0;
+  color: #cdd9e8;
+  line-height: 1.65;
+}
+.narrative ul {
+  margin: 0.5rem 0 0.5rem 1.1rem;
+  list-style: disc;
+}
+.narrative li {
+  margin: 0.3rem 0;
+  color: #cdd9e8;
+  line-height: 1.6;
+}
+.narrative strong {
+  color: var(--text);
+  font-weight: 650;
+}
+.narrative code {
+  background: var(--panel-2);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+.narrative hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1rem 0;
+}
