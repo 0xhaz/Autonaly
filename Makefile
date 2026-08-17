@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup up down logs smoke test lint fmt engine-local clean
+.PHONY: help setup up down logs smoke test lint fmt engine-local clean data pipeline
 
 help:  ## Show available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -23,6 +23,15 @@ logs:  ## Tail emulator logs
 
 smoke:  ## P0 exit gate — all three ports + a real Vertex call
 	uv run python scripts/smoke.py
+
+data:  ## Download + extract BACI (parallel ranges; CEPII throttles per connection)
+	bash scripts/fetch_baci.sh HS22 V202601 10
+	mkdir -p data/baci
+	unzip -o -j data/BACI_HS22_V202601.zip -d data/baci
+	@ls -lh data/baci | head
+
+pipeline:  ## Run the refinery: BACI -> DDR/HHI -> artifacts (DQ gates enforced)
+	uv run python -m autonaly_pipeline.cli --year 2024
 
 test:  ## Run the test suite (offline; cassettes, no cloud)
 	uv run pytest
