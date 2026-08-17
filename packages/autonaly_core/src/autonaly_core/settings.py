@@ -66,7 +66,64 @@ class Settings(BaseSettings):
     def is_local(self) -> bool:
         return self.env is Env.LOCAL
 
+    def assert_environment_consistent(self) -> None:
+        """Refuse to run local against production, or cloud against emulators.
+
+        Silent misrouting is worse than a crash: the injector published to real
+        Pub/Sub for an entire debugging session while appearing to work, because
+        publishing to production succeeds perfectly well. This turns that class
+        of mistake into an immediate, legible failure.
+        """
+        import os
+
+        pubsub = os.environ.get("PUBSUB_EMULATOR_HOST")
+        firestore = os.environ.get("FIRESTORE_EMULATOR_HOST")
+
+        if self.is_local:
+            missing = [
+                name
+                for name, value in (
+                    ("PUBSUB_EMULATOR_HOST", pubsub),
+                    ("FIRESTORE_EMULATOR_HOST", firestore),
+                )
+                if not value
+            ]
+            if missing:
+                raise RuntimeError(
+                    f"AUTONALY_ENV=local but {' and '.join(missing)} not set — "
+                    f"Google clients would silently use REAL GCP. Start the "
+                    f"emulators with `make up`, or set AUTONALY_ENV=gcp deliberately."
+                )
+        elif pubsub or firestore:
+            raise RuntimeError(
+                "AUTONALY_ENV=gcp but emulator host variables are set — cloud "
+                "traffic would be redirected to a local emulator. Unset "
+                "PUBSUB_EMULATOR_HOST and FIRESTORE_EMULATOR_HOST."
+            )
+
+
+def _load_env_files() -> None:
+    """Load .env into the real process environment, not just into Settings.
+
+    pydantic-settings reads the env file into this object, but the Google client
+    libraries read `PUBSUB_EMULATOR_HOST` and `FIRESTORE_EMULATOR_HOST` from
+    `os.environ`. A process that built Settings without also populating os.environ
+    therefore looked correctly configured while silently talking to production —
+    which is exactly what happened to the replay injector, creating real topics
+    and publishing real messages to GCP while the worker listened to the
+    emulator. Loading here means importing settings is sufficient.
+    """
+    from dotenv import load_dotenv
+
+    for name in (".env.local", ".env.gcp"):
+        path = REPO_ROOT / name
+        if path.exists():
+            load_dotenv(path, override=False)
+
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    _load_env_files()
+    settings = Settings()
+    settings.assert_environment_consistent()
+    return settings

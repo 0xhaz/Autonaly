@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup up down logs smoke test lint fmt engine-local clean data pipeline
+.PHONY: help setup up down logs smoke test lint fmt engine-local clean data pipeline worker replay-suez replay-malformed dlq agent
 
 help:  ## Show available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -44,6 +44,23 @@ fmt:  ## Ruff format + import sort
 
 engine-local:  ## Run the exposure engine on :8080
 	uv run uvicorn autonaly_engine.main:app --reload --port 8080
+
+worker:  ## Run the Pub/Sub worker (needs emulators + engine)
+	uv run python -m autonaly_ingest.worker
+
+replay-suez:  ## Inject the 2021 Suez signal as if it were breaking now
+	uv run python -m autonaly_ingest.injector suez
+
+replay-malformed:  ## Inject an invalid signal to exercise the dead-letter path
+	uv run python -m autonaly_ingest.injector --malformed
+
+dlq:  ## Show what landed in the dead-letter queue
+	uv run python -c "from dotenv import load_dotenv; load_dotenv('.env.local'); \
+	  from autonaly_ingest.topology import drain_dlq; import json; \
+	  [print(json.dumps(m, indent=2)) for m in drain_dlq()] or print('  dead-letter queue empty')"
+
+agent:  ## Run the agent over one signal directly (no Pub/Sub)
+	uv run python scripts/run_agent.py $(SIGNAL)
 
 clean:  ## Remove local artifacts and caches
 	rm -rf artifacts/_smoke .pytest_cache .ruff_cache
