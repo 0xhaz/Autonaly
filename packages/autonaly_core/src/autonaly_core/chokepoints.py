@@ -58,6 +58,11 @@ class Chokepoint:
 
     baskets: tuple[str, ...]
     reroute: Reroute
+    lat: float = 0.0
+    lon: float = 0.0
+    """Position, so an event can be drawn where it actually happens. Values from
+    IMF PortWatch's chokepoint database."""
+
     importer_filter: tuple[str, ...] | None = None
     """Importers actually served by this route. None means global."""
 
@@ -82,6 +87,8 @@ _GULF = ("SAU", "ARE", "IRQ", "KWT", "QAT", "IRN", "BHR")
 CHOKEPOINTS: tuple[Chokepoint, ...] = (
     Chokepoint(
         key="suez",
+        lat=30.59,
+        lon=32.44,
         portwatch_name="Suez Canal",
         label="Suez Canal",
         source_countries=(
@@ -103,6 +110,8 @@ CHOKEPOINTS: tuple[Chokepoint, ...] = (
     ),
     Chokepoint(
         key="hormuz",
+        lat=26.3,
+        lon=56.86,
         portwatch_name="Strait of Hormuz",
         label="Strait of Hormuz",
         source_countries=_GULF,
@@ -117,6 +126,8 @@ CHOKEPOINTS: tuple[Chokepoint, ...] = (
     ),
     Chokepoint(
         key="bab_el_mandeb",
+        lat=12.79,
+        lon=43.35,
         portwatch_name="Bab el-Mandeb Strait",
         label="Bab el-Mandeb Strait",
         source_countries=(

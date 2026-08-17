@@ -344,6 +344,8 @@ def list_chokepoints() -> dict[str, list[dict]]:
                 "baskets": list(c.baskets),
                 "reroute": c.reroute.value,
                 "attenuation": c.attenuation(),
+                "lat": c.lat,
+                "lon": c.lon,
                 "global_exposure": c.importer_filter is None,
                 "note": c.note,
             }
