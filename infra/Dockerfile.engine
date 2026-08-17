@@ -1,0 +1,36 @@
+# Exposure engine — Cloud Run service #1.
+#
+# Deliberately installs only the engine and its dependencies. The agent's
+# google-genai is absent from this image, which is how the deterministic boundary
+# is enforced: this container physically cannot call a model.
+
+FROM python:3.12-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# Dependency layer first so source edits do not invalidate the install.
+COPY pyproject.toml uv.lock ./
+COPY packages/autonaly_core/pyproject.toml packages/autonaly_core/
+COPY packages/autonaly_engine/pyproject.toml packages/autonaly_engine/
+COPY packages/autonaly_pipeline/pyproject.toml packages/autonaly_pipeline/
+COPY packages/autonaly_agent/pyproject.toml packages/autonaly_agent/
+COPY packages/autonaly_ingest/pyproject.toml packages/autonaly_ingest/
+
+COPY packages/ packages/
+
+RUN uv sync --frozen --package autonaly-engine --no-dev
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Cloud Run supplies PORT; 8080 matches the local default so the same curl works.
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["sh", "-c", "uvicorn autonaly_engine.main:app --host 0.0.0.0 --port ${PORT}"]

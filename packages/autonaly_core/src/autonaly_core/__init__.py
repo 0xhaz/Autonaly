@@ -58,6 +58,9 @@ def build_artifact_store(settings: Settings | None = None) -> ArtifactStore:
 
 def build_event_bus(settings: Settings | None = None) -> EventBus:
     s = settings or get_settings()
+    # Checked here rather than in get_settings(): this is the moment a client is
+    # created that will silently address production if the environment is wrong.
+    s.assert_environment_consistent()
     from .adapters.bus import PubSubEventBus
 
     return PubSubEventBus(s.project_id)
@@ -65,6 +68,7 @@ def build_event_bus(settings: Settings | None = None) -> EventBus:
 
 def build_review_queue(settings: Settings | None = None) -> ReviewQueue:
     s = settings or get_settings()
+    s.assert_environment_consistent()
     from .adapters.queue import FirestoreReviewQueue
 
     return FirestoreReviewQueue(s.project_id, s.briefings_collection)

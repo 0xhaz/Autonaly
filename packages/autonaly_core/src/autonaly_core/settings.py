@@ -123,7 +123,9 @@ def _load_env_files() -> None:
 
 @lru_cache
 def get_settings() -> Settings:
+    # The consistency check deliberately does NOT run here. It belongs where the
+    # risk is — the factories that build Pub/Sub and Firestore clients. The
+    # exposure engine reads artifacts and never touches either, so requiring it
+    # to declare emulator hosts it will not use would be noise.
     _load_env_files()
-    settings = Settings()
-    settings.assert_environment_consistent()
-    return settings
+    return Settings()
