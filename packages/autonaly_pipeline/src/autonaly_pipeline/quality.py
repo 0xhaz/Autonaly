@@ -106,4 +106,15 @@ def run_gates(con: duckdb.DuckDBPyConnection, unresolved_m49: list[int]) -> Qual
         f"{importers} importers, {products:,} products",
     )
 
+    # 7. Commodity baskets resolve. A typo'd HS6 contributes zero instead of
+    #    failing, which understates an exposure — exactly the silent-wrong
+    #    failure mode baskets exist to prevent.
+    from autonaly_core.baskets import validate as validate_baskets
+
+    traded = {
+        row[0] for row in con.execute("SELECT DISTINCT hs6 FROM flows").fetchall()
+    }
+    basket_check = validate_baskets(known_codes=traded, traded_codes=traded)
+    report.add("commodity baskets resolve", basket_check.ok, basket_check.describe())
+
     return report

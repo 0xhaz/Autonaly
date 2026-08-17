@@ -219,6 +219,7 @@ version = "0.1.0"
 source = { editable = "packages/autonaly_engine" }
 dependencies = [
     { name = "autonaly-core" },
+    { name = "duckdb" },
     { name = "fastapi" },
     { name = "numpy" },
     { name = "pyarrow" },
@@ -228,6 +229,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "autonaly-core", editable = "packages/autonaly_core" },
+    { name = "duckdb", specifier = ">=1.1" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "pyarrow", specifier = ">=18.0" },

@@ -9,7 +9,10 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "numpy>=2.1",
     "pyarrow>=18.0",
+    "duckdb>=1.1",
 ]
+# Deliberately absent: google-genai. The engine is the deterministic half of the
+# architecture, and the dependency graph is what enforces that, not a convention.
 
 [build-system]
 requires = ["hatchling"]

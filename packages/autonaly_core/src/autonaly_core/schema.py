@@ -100,6 +100,15 @@ class AffectedCountry(BaseModel):
     score: Score | None = None
     ddr: Ratio | None = Field(default=None, description="Direct dependency ratio (D13.1)")
     hhi: float | None = Field(default=None, description="Supplier concentration (D13.2)")
+    value_at_risk_kusd: float | None = Field(
+        default=None,
+        description=(
+            "Absolute import value from disrupted sources. Carried alongside the "
+            "ratio because intensity and magnitude answer different questions: a "
+            "99%-dependent country importing $60m is not the story a briefing "
+            "should lead with when a 77%-dependent one imports $5.2bn."
+        ),
+    )
     channel: str
     evidence: list[str] = Field(default_factory=list)
 
@@ -177,6 +186,17 @@ class Rankings(BaseModel):
     event_key: str
     severity_label: str
     affected: list[AffectedCountry]
+    """Ranked by exposure score, i.e. by *intensity* of dependency."""
+
+    largest_absolute_exposure: str | None = Field(
+        default=None,
+        description=(
+            "Country with the most trade value at risk. Computed here, not left to "
+            "the briefing writer: intensity ranking favours small, concentrated "
+            "importers, so a narrative built from the top of `affected` alone will "
+            "lead with the wrong country. The composer must cite this for magnitude."
+        ),
+    )
     winners: list[Winner] = Field(default_factory=list)
     methodology_version: str
 
