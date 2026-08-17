@@ -12,6 +12,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {/* Served from /vendor alongside the MapLibre bundle. Next would rather
+            this went through the bundler, but MapLibre's JS deliberately does
+            not — see ExposureMap — and the CSS must sit beside it. */}
+        {/* eslint-disable-next-line @next/next/no-css-tags */}
+        <link rel="stylesheet" href="/vendor/maplibre/maplibre-gl.css" />
+      </head>
       <body>
         <header className="border-b" style={{ borderColor: "var(--line)" }}>
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">

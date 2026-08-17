@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored MapLibre dist — third-party build output copied from
+    // node_modules by the prebuild step, not source we lint.
+    "public/vendor/**",
   ]),
 ]);
 

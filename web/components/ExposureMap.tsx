@@ -1,35 +1,63 @@
 "use client";
 
-// MapLibre v5 ships named exports only — there is no default export.
-import {
-  Map as MapLibreMap,
-  NavigationControl,
-  Popup,
-  type MapLayerMouseEvent,
-} from "maplibre-gl";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { AffectedCountry } from "@/lib/types";
 
 /**
  * Exposure choropleth.
  *
- * Deliberately has no basemap and no tile server: the country polygons ship as a
- * 248KB GeoJSON in /public and MapLibre renders them directly. That keeps the
- * page working offline, which matters when the demo is being recorded and when a
- * judge runs the repo cold.
+ * No basemap and no tile server: the country polygons ship as a 248KB GeoJSON in
+ * /public and MapLibre renders them directly, so the page works offline — during
+ * a recording, and for anyone running the repo cold.
+ *
+ * The geometry is fetched *before* the map is constructed and the source is
+ * declared inline in the style. That ordering is deliberate. Building the map
+ * first and calling addSource/addLayer afterwards races against React re-running
+ * this effect — `affected` is a fresh array identity on every render — which
+ * tore the map down mid-initialisation and left a dead instance. The only
+ * symptom was a source that never finished loading: no exception, no render, and
+ * an internal "no tile manager" error visible only from a debugger.
+ *
+ * MapLibre is loaded from /vendor/maplibre rather than imported through the
+ * bundler, and that is not a stylistic choice. MapLibre spawns its tile worker
+ * with `new Worker(new URL("./maplibre-gl-worker.mjs", import.meta.url))`.
+ * Inside a Next bundle `import.meta.url` resolves to the page chunk, so the
+ * worker is handed the HTML document to execute. It fails silently: the map
+ * builds, layers attach, and every source stays permanently unloaded with an
+ * empty canvas and no error. Serving MapLibre's own dist keeps that relative URL
+ * correct. The files are copied from node_modules by a prebuild step, so nothing
+ * vendored is committed and the page still needs no network.
  */
 
-// Sequential ramp over the 0-100 score. Kept coarse on purpose — the table
-// carries the precise figures, the map carries the shape of the story.
-const RAMP: [number, string][] = [
-  [0, "#1b2735"],
-  [10, "#1d3a5c"],
-  [25, "#1f5c86"],
-  [45, "#2b83a6"],
-  [65, "#e8a33d"],
-  [85, "#d1495b"],
-];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MapLibre = any;
+
+const MAPLIBRE_URL = "/vendor/maplibre/maplibre-gl.mjs";
+
+// Sequential ramp, applied across the range this briefing actually spans rather
+// than a fixed 0-100. A chokepoint with a bypass legitimately scores 1-3, and on
+// an absolute scale the whole map renders near-black — technically faithful and
+// completely unreadable. The legend below the map states the range so the
+// shading can never imply a severity the numbers do not support.
+const RAMP_COLORS = ["#1b2735", "#1d3a5c", "#1f5c86", "#2b83a6", "#e8a33d", "#d1495b"];
+
+// Never stretch a trivial range into a full-spectrum map.
+const MIN_DOMAIN = 5;
+
+function rampStops(maxScore: number): (number | string)[] {
+  const domain = Math.max(MIN_DOMAIN, maxScore);
+  return RAMP_COLORS.flatMap((color, i) => [
+    (domain * i) / (RAMP_COLORS.length - 1),
+    color,
+  ]);
+}
+
+interface WorldFeature {
+  type: "Feature";
+  properties: { iso3: string; name: string };
+  geometry: unknown;
+}
 
 export default function ExposureMap({
   affected,
@@ -39,115 +67,158 @@ export default function ExposureMap({
   highlight?: string | null;
 }) {
   const container = useRef<HTMLDivElement>(null);
-  const map = useRef<MapLibreMap | null>(null);
+  const map = useRef<MapLibre>(null);
+  const [world, setWorld] = useState<{ features: WorldFeature[] } | null>(null);
 
   useEffect(() => {
-    if (!container.current || map.current) return;
+    let cancelled = false;
+    fetch("/world.geo.json")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setWorld(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!container.current || !world || map.current) return;
+    let disposed = false;
+
+    (async () => {
+      // Non-literal specifier: a string literal here makes TypeScript try to
+      // resolve a runtime URL as a module path, and the magic comments keep the
+      // bundler from rewriting it.
+      const maplibre: MapLibre = await import(
+        /* webpackIgnore: true */ /* turbopackIgnore: true */ MAPLIBRE_URL
+      );
+      if (disposed || !container.current || map.current) return;
 
     const scores = new Map(affected.map((a) => [a.country, a.score ?? 0]));
-
-    map.current = new MapLibreMap({
-      container: container.current,
-      style: {
-        version: 8,
-        sources: {},
-        layers: [
-          { id: "bg", type: "background", paint: { "background-color": "#0b0f14" } },
-        ],
-        glyphs: undefined,
-      },
-      center: [15, 25],
-      zoom: 1.1,
-      attributionControl: false,
-    });
-
-    const m = map.current;
-    m.addControl(new NavigationControl({ showCompass: false }), "top-right");
-
-    m.on("load", async () => {
-      const response = await fetch("/world.geo.json");
-      const world = await response.json();
-
-      // Score is joined onto the geometry here rather than via a feature-state
-      // round trip — the dataset is 177 features, so simplicity wins.
-      for (const feature of world.features) {
-        const iso3 = feature.properties.iso3;
-        feature.properties.score = scores.get(iso3) ?? null;
-        feature.properties.scored = scores.has(iso3) ? 1 : 0;
-      }
-
-      m.addSource("world", { type: "geojson", data: world });
-
-      m.addLayer({
-        id: "countries",
-        type: "fill",
-        source: "world",
-        paint: {
-          "fill-color": [
-            "case",
-            ["==", ["get", "scored"], 0],
-            "#131a24",
-            ["interpolate", ["linear"], ["get", "score"], ...RAMP.flat()],
-          ],
-          "fill-opacity": 0.92,
+    const maxScore = Math.max(0, ...affected.map((a) => a.score ?? 0));
+    const scored = {
+      type: "FeatureCollection" as const,
+      features: world.features.map((f) => ({
+        ...f,
+        properties: {
+          ...f.properties,
+          // Always numeric: a null makes the fill-color `interpolate`
+          // unevaluable inside the tile worker.
+          score: scores.get(f.properties.iso3) ?? 0,
+          scored: scores.has(f.properties.iso3) ? 1 : 0,
         },
-      });
+      })),
+    };
 
-      m.addLayer({
-        id: "borders",
-        type: "line",
-        source: "world",
-        paint: { "line-color": "#2a3a47", "line-width": 0.4 },
-      });
-
-      if (highlight) {
-        m.addLayer({
-          id: "highlight",
+    const style = {
+      version: 8,
+      // No `glyphs` key at all: MapLibre validates the spec strictly, and an
+      // explicit `glyphs: undefined` fails as "string expected", aborting the
+      // style load and leaving an empty canvas.
+      sources: { world: { type: "geojson", data: scored } },
+      layers: [
+        { id: "bg", type: "background", paint: { "background-color": "#0b0f14" } },
+        {
+          id: "countries",
+          type: "fill",
+          source: "world",
+          paint: {
+            "fill-color": [
+              "case",
+              ["==", ["get", "scored"], 0],
+              "#131a24",
+              ["interpolate", ["linear"], ["get", "score"], ...rampStops(maxScore)],
+            ],
+            "fill-opacity": 0.92,
+          },
+        },
+        {
+          id: "borders",
           type: "line",
           source: "world",
-          filter: ["==", ["get", "iso3"], highlight],
-          paint: { "line-color": "#ffffff", "line-width": 1.6 },
-        });
-      }
+          paint: { "line-color": "#2a3a47", "line-width": 0.4 },
+        },
+        ...(highlight
+          ? [
+              {
+                id: "highlight",
+                type: "line",
+                source: "world",
+                filter: ["==", ["get", "iso3"], highlight],
+                paint: { "line-color": "#ffffff", "line-width": 1.6 },
+              },
+            ]
+          : []),
+      ],
+    };
 
-      const popup = new Popup({
-        closeButton: false,
-        className: "autonaly-popup",
-      });
+    const m = new maplibre.Map({
+      container: container.current,
+      style,
+      center: [15, 25],
+      zoom: 1.05,
+      attributionControl: false,
+    });
+    map.current = m;
 
-      m.on("mousemove", "countries", (event: MapLayerMouseEvent) => {
-        const feature = event.features?.[0];
-        if (!feature) return;
-        const { name, score, scored } = feature.properties as Record<string, unknown>;
-        m.getCanvas().style.cursor = "pointer";
-        popup
-          .setLngLat(event.lngLat)
-          .setHTML(
-            `<div style="font:12px ui-sans-serif;color:#e6edf6">
-               <strong>${name}</strong><br/>
-               ${scored ? `exposure ${Number(score).toFixed(1)}/100` : "not ranked"}
-             </div>`,
-          )
-          .addTo(m);
-      });
+    m.addControl(new maplibre.NavigationControl({ showCompass: false }), "top-right");
 
-      m.on("mouseleave", "countries", () => {
-        m.getCanvas().style.cursor = "";
-        popup.remove();
-      });
+    const popup = new maplibre.Popup({ closeButton: false, closeOnMove: true });
+
+    m.on("mousemove", "countries", (event: { features?: unknown[]; lngLat: unknown }) => {
+      const feature = event.features?.[0] as { properties: Record<string, unknown> } | undefined;
+      if (!feature) return;
+      const props = feature.properties;
+      m.getCanvas().style.cursor = "pointer";
+      popup
+        .setLngLat(event.lngLat)
+        .setHTML(
+          `<div style="font:12px ui-sans-serif;color:#0b0f14">
+             <strong>${props.name}</strong><br/>
+             ${props.scored ? `exposure ${Number(props.score).toFixed(1)}/100` : "not ranked"}
+           </div>`,
+        )
+        .addTo(m);
     });
 
+    m.on("mouseleave", "countries", () => {
+      m.getCanvas().style.cursor = "";
+      popup.remove();
+    });
+
+    })();
+
     return () => {
+      disposed = true;
       map.current?.remove();
       map.current = null;
     };
-  }, [affected, highlight]);
+    // `affected` and `highlight` are read at construction. They describe a single
+    // briefing and do not change while this page is mounted, so rebuilding the
+    // map on their identity would only reintroduce the teardown race.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world]);
+
+  const domainMax = Math.max(MIN_DOMAIN, ...affected.map((a) => a.score ?? 0));
 
   return (
-    <div
-      ref={container}
-      className="h-[380px] w-full overflow-hidden rounded-lg"
-      style={{ border: "1px solid var(--line)" }}
-    />
+    <div className="space-y-2">
+      <div
+        ref={container}
+        className="h-[380px] w-full overflow-hidden rounded-lg"
+        style={{ border: "1px solid var(--line)" }}
+      />
+      <div className="flex items-center gap-3 text-xs" style={{ color: "var(--muted)" }}>
+        <span>exposure score 0</span>
+        <span
+          className="h-2 w-40 rounded-sm"
+          style={{ background: `linear-gradient(to right, ${RAMP_COLORS.join(",")})` }}
+        />
+        <span className="mono">{domainMax.toFixed(1)}</span>
+        <span className="ml-2">· white outline = largest absolute value at risk</span>
+      </div>
+    </div>
   );
 }

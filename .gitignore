@@ -31,6 +31,8 @@ build/
 
 # node
 node_modules/
+# copied from node_modules by a prebuild step (see web/package.json)
+web/public/vendor/
 .next/
 out/
 .vercel
