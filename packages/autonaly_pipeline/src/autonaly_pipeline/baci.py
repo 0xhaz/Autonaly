@@ -40,6 +40,10 @@ class BuildConfig:
             revision=self.revision, year=self.year, version=self.version.lstrip("V")
         )
 
+    @property
+    def country_codes_path(self) -> Path:
+        return self.raw_dir / f"country_codes_{self.version}.csv"
+
 
 def connect(threads: int | None = None) -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
@@ -56,10 +60,8 @@ def load_raw(con: duckdb.DuckDBPyConnection, cfg: BuildConfig) -> int:
             f"Expected the extracted archive in {cfg.raw_dir}"
         )
 
-    from .countries import DROP_M49
-
-    drop_list = ",".join(str(c) for c in sorted(DROP_M49))
-
+    # Aggregates are dropped by the inner join in attach_iso3(), not here — one
+    # place decides what counts as a country.
     con.execute(
         f"""
         CREATE OR REPLACE TABLE raw AS
@@ -72,31 +74,34 @@ def load_raw(con: duckdb.DuckDBPyConnection, cfg: BuildConfig) -> int:
             TRY_CAST(q AS DOUBLE)     AS qty_tonnes
         FROM read_csv('{cfg.csv_path}', header=true, all_varchar=true)
         WHERE TRY_CAST(v AS DOUBLE) > {cfg.min_value_kusd}
-          AND CAST(i AS INTEGER) NOT IN ({drop_list})
-          AND CAST(j AS INTEGER) NOT IN ({drop_list})
           AND CAST(i AS INTEGER) <> CAST(j AS INTEGER)
         """
     )
     return con.execute("SELECT count(*) FROM raw").fetchone()[0]
 
 
-def attach_iso3(con: duckdb.DuckDBPyConnection) -> list[int]:
-    """Join M49 -> ISO3. Returns codes the mapping could not resolve."""
-    from .countries import build_lookup
+def attach_iso3(con: duckdb.DuckDBPyConnection, cfg: BuildConfig) -> list[int]:
+    """Join M49 -> ISO3 using BACI's own code table. Returns unresolved codes.
 
-    codes = [
+    The inner join is what removes aggregates: a code with no ISO3 simply has no
+    row here, so its flows drop out.
+    """
+    from .countries import load_lookup
+
+    resolved, unresolved = load_lookup(cfg.country_codes_path)
+
+    con.execute("CREATE OR REPLACE TABLE iso3 (m49 INTEGER, iso3 VARCHAR)")
+    con.executemany("INSERT INTO iso3 VALUES (?, ?)", list(resolved.items()))
+
+    # Only report unresolved codes that actually carry flows this year.
+    present = {
         row[0]
         for row in con.execute(
             "SELECT DISTINCT exporter_m49 FROM raw "
             "UNION SELECT DISTINCT importer_m49 FROM raw"
         ).fetchall()
-    ]
-    resolved, unresolved = build_lookup(codes)
-
-    con.execute("CREATE OR REPLACE TABLE iso3 (m49 INTEGER, iso3 VARCHAR)")
-    con.executemany(
-        "INSERT INTO iso3 VALUES (?, ?)", [(m, i) for m, i in resolved.items()]
-    )
+    }
+    unresolved = tuple(c for c in unresolved if c in present)
 
     con.execute(
         """
@@ -115,7 +120,7 @@ def attach_iso3(con: duckdb.DuckDBPyConnection) -> list[int]:
         GROUP BY 1, 2, 3, 4
         """
     )
-    return unresolved
+    return list(unresolved)
 
 
 def build_ddr(con: duckdb.DuckDBPyConnection) -> int:
@@ -172,7 +177,7 @@ def build(cfg: BuildConfig, threads: int | None = None) -> dict[str, object]:
     rows = load_raw(con, cfg)
     log.info("loaded %s raw rows for %s", f"{rows:,}", cfg.year)
 
-    unresolved = attach_iso3(con)
+    unresolved = attach_iso3(con, cfg)
     if unresolved:
         log.warning("unresolved M49 codes (add to countries.MANUAL_M49): %s", unresolved)
 

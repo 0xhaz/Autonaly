@@ -1,83 +1,68 @@
 """Country-code reconciliation (techstacks.md §2).
 
-BACI uses UN M49 numeric codes. We need ISO3 for joins with PortWatch, WDI and
-the map layer. `pycountry` covers the ordinary cases; the table below covers the
-ones it cannot, which are exactly the ones that matter politically. Taiwan and
-Kosovo are handled explicitly per techstacks.md rather than silently dropped.
+BACI ships its own `country_codes_V*.csv` carrying ISO2/ISO3, so that table is
+the authority rather than a general-purpose library — it is the mapping the
+trade data was actually built against. We read it and override only where it
+declines to take a position.
+
+Verified against V202601 (2024): exactly three codes lack a standard ISO3.
+
+    490  "Other Asia, nes"                 -> TWN   ($526bn exports — Taiwan)
+    697  "Europe EFTA, nes"                -> drop  (empty aggregate)
+    711  "Southern African Customs Union"  -> drop  (empty pre-1999 aggregate)
+
+The 490 mapping is load-bearing, not cosmetic. Left unmapped, Taiwan vanishes
+from every ranking — and with it semiconductors, which is precisely the
+sub-national concentration case architecture.md D19 calls out as moat material.
 """
 
 from __future__ import annotations
 
+import csv
 import functools
+import re
+from pathlib import Path
 
-# BACI/M49 codes with no clean pycountry resolution. Values of None are
-# deliberate drops: aggregates and residual categories, not countries.
-MANUAL_M49: dict[int, str | None] = {
-    490: "TWN",  # "Other Asia, nes" — in practice Taiwan in customs data
-    158: "TWN",  # Taiwan, Province of China
-    891: None,  # Serbia and Montenegro (pre-2006 aggregate)
-    699: "IND",  # India, pre-1975 boundary code
-    711: "ZAF",  # Southern African Customs Union
-    757: "CHE",  # Switzerland incl. Liechtenstein
-    842: "USA",  # USA incl. Puerto Rico and US Virgin Islands
-    849: "USA",
-    381: "ITA",  # Italy incl. San Marino
-    251: "FRA",  # France incl. Monaco
-    579: "NOR",  # Norway incl. Svalbard
+ISO3_RE = re.compile(r"^[A-Z]{3}$")
+
+# BACI placeholders that look like ISO3 but are not (S19, R20, ZA1 ...).
+NON_STANDARD_ISO3 = re.compile(r"^[A-Z]{1,2}\d")
+
+OVERRIDES: dict[int, str] = {
+    490: "TWN",  # "Other Asia, nes" — Taiwan in all but name
 }
 
-# Residual/aggregate M49 codes that must never appear as a "country" in output.
-DROP_M49: frozenset[int] = frozenset(
+DROP: frozenset[int] = frozenset(
     {
-        0,  # World
-        129,  # Caribbean, nes
-        221,  # Areas, nes
-        290,  # Northern Africa, nes
-        527,  # Oceania, nes
-        577,  # Other Africa, nes
-        637,  # Other America, nes
-        697,  # Europe, nes
-        838,  # Free Zones
-        839,  # Special Categories
-        879,  # Western Asia, nes
-        899,  # Areas not elsewhere specified
+        697,  # Europe EFTA, nes — aggregate, zero flows in 2024
+        711,  # Southern African Customs Union (...1999) — historical aggregate
     }
 )
 
 
 @functools.cache
-def _pycountry_index() -> dict[int, str]:
-    import pycountry
+def load_lookup(codes_csv: Path) -> tuple[dict[int, str], tuple[int, ...]]:
+    """Read BACI's code table. Returns (m49 -> ISO3, unresolved codes).
 
-    index: dict[int, str] = {}
-    for country in pycountry.countries:
-        numeric = getattr(country, "numeric", None)
-        if numeric:
-            index[int(numeric)] = country.alpha_3
-    return index
-
-
-def m49_to_iso3(code: int) -> str | None:
-    """Return ISO3, or None when the code is an aggregate that should be dropped."""
-    if code in DROP_M49:
-        return None
-    if code in MANUAL_M49:
-        return MANUAL_M49[code]
-    return _pycountry_index().get(code)
-
-
-def build_lookup(codes: list[int]) -> tuple[dict[int, str], list[int]]:
-    """Map the codes present in the data. Returns (resolved, unresolved).
-
-    Unresolved codes are surfaced rather than silently dropped — an unexpected
-    one means BACI changed and the mapping table needs a line.
+    Unresolved codes are returned rather than silently dropped: a new one means
+    BACI changed and this module needs a line, which is a decision for a human.
     """
     resolved: dict[int, str] = {}
     unresolved: list[int] = []
-    for code in codes:
-        iso3 = m49_to_iso3(code)
-        if iso3:
-            resolved[code] = iso3
-        elif code not in DROP_M49:
-            unresolved.append(code)
-    return resolved, sorted(unresolved)
+
+    with Path(codes_csv).open(newline="", encoding="utf-8-sig") as fh:
+        for row in csv.DictReader(fh):
+            code = int(row["country_code"])
+            if code in DROP:
+                continue
+            if code in OVERRIDES:
+                resolved[code] = OVERRIDES[code]
+                continue
+
+            iso3 = (row.get("country_iso3") or "").strip().upper()
+            if ISO3_RE.match(iso3) and not NON_STANDARD_ISO3.match(iso3):
+                resolved[code] = iso3
+            else:
+                unresolved.append(code)
+
+    return resolved, tuple(sorted(unresolved))
