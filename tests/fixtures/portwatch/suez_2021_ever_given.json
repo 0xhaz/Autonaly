@@ -1,0 +1,468 @@
+{
+  "attribution": "Data: UN Global Platform; IMF PortWatch",
+  "chokepoint": "Suez Canal",
+  "event_window": [
+    "2021-03-23",
+    "2021-03-29"
+  ],
+  "baseline_window": [
+    "2021-02-23",
+    "2021-03-22"
+  ],
+  "baseline_mean": 56.93,
+  "event_mean": 16.43,
+  "trough_day": "2021-03-25",
+  "trough_count": 2,
+  "reference_mean": 53.09,
+  "suspect_reason": null,
+  "series": [
+    {
+      "day": "2021-02-23",
+      "n_total": 62,
+      "n_container": 21,
+      "n_tanker": 21,
+      "n_dry_bulk": 13,
+      "capacity": 2484595
+    },
+    {
+      "day": "2021-02-24",
+      "n_total": 50,
+      "n_container": 15,
+      "n_tanker": 14,
+      "n_dry_bulk": 15,
+      "capacity": 2934892
+    },
+    {
+      "day": "2021-02-25",
+      "n_total": 65,
+      "n_container": 14,
+      "n_tanker": 16,
+      "n_dry_bulk": 18,
+      "capacity": 2728481
+    },
+    {
+      "day": "2021-02-26",
+      "n_total": 64,
+      "n_container": 19,
+      "n_tanker": 17,
+      "n_dry_bulk": 19,
+      "capacity": 2988265
+    },
+    {
+      "day": "2021-02-27",
+      "n_total": 43,
+      "n_container": 16,
+      "n_tanker": 11,
+      "n_dry_bulk": 10,
+      "capacity": 1821621
+    },
+    {
+      "day": "2021-02-28",
+      "n_total": 64,
+      "n_container": 17,
+      "n_tanker": 12,
+      "n_dry_bulk": 25,
+      "capacity": 2900469
+    },
+    {
+      "day": "2021-03-01",
+      "n_total": 64,
+      "n_container": 23,
+      "n_tanker": 16,
+      "n_dry_bulk": 12,
+      "capacity": 2878685
+    },
+    {
+      "day": "2021-03-02",
+      "n_total": 51,
+      "n_container": 17,
+      "n_tanker": 9,
+      "n_dry_bulk": 18,
+      "capacity": 2044297
+    },
+    {
+      "day": "2021-03-03",
+      "n_total": 65,
+      "n_container": 14,
+      "n_tanker": 25,
+      "n_dry_bulk": 11,
+      "capacity": 2819375
+    },
+    {
+      "day": "2021-03-04",
+      "n_total": 58,
+      "n_container": 20,
+      "n_tanker": 20,
+      "n_dry_bulk": 11,
+      "capacity": 2786733
+    },
+    {
+      "day": "2021-03-05",
+      "n_total": 61,
+      "n_container": 19,
+      "n_tanker": 22,
+      "n_dry_bulk": 13,
+      "capacity": 2968305
+    },
+    {
+      "day": "2021-03-06",
+      "n_total": 54,
+      "n_container": 19,
+      "n_tanker": 13,
+      "n_dry_bulk": 15,
+      "capacity": 2698097
+    },
+    {
+      "day": "2021-03-07",
+      "n_total": 64,
+      "n_container": 16,
+      "n_tanker": 21,
+      "n_dry_bulk": 15,
+      "capacity": 2216966
+    },
+    {
+      "day": "2021-03-08",
+      "n_total": 57,
+      "n_container": 19,
+      "n_tanker": 13,
+      "n_dry_bulk": 18,
+      "capacity": 2205040
+    },
+    {
+      "day": "2021-03-09",
+      "n_total": 69,
+      "n_container": 21,
+      "n_tanker": 13,
+      "n_dry_bulk": 22,
+      "capacity": 2989534
+    },
+    {
+      "day": "2021-03-10",
+      "n_total": 59,
+      "n_container": 18,
+      "n_tanker": 23,
+      "n_dry_bulk": 15,
+      "capacity": 3123846
+    },
+    {
+      "day": "2021-03-11",
+      "n_total": 55,
+      "n_container": 16,
+      "n_tanker": 22,
+      "n_dry_bulk": 12,
+      "capacity": 2368151
+    },
+    {
+      "day": "2021-03-12",
+      "n_total": 54,
+      "n_container": 22,
+      "n_tanker": 12,
+      "n_dry_bulk": 15,
+      "capacity": 2808077
+    },
+    {
+      "day": "2021-03-13",
+      "n_total": 49,
+      "n_container": 15,
+      "n_tanker": 15,
+      "n_dry_bulk": 10,
+      "capacity": 2667096
+    },
+    {
+      "day": "2021-03-14",
+      "n_total": 58,
+      "n_container": 20,
+      "n_tanker": 16,
+      "n_dry_bulk": 13,
+      "capacity": 3211868
+    },
+    {
+      "day": "2021-03-15",
+      "n_total": 52,
+      "n_container": 13,
+      "n_tanker": 18,
+      "n_dry_bulk": 6,
+      "capacity": 1773388
+    },
+    {
+      "day": "2021-03-16",
+      "n_total": 56,
+      "n_container": 17,
+      "n_tanker": 12,
+      "n_dry_bulk": 17,
+      "capacity": 2118318
+    },
+    {
+      "day": "2021-03-17",
+      "n_total": 47,
+      "n_container": 15,
+      "n_tanker": 13,
+      "n_dry_bulk": 12,
+      "capacity": 2569452
+    },
+    {
+      "day": "2021-03-18",
+      "n_total": 51,
+      "n_container": 8,
+      "n_tanker": 19,
+      "n_dry_bulk": 20,
+      "capacity": 2166224
+    },
+    {
+      "day": "2021-03-19",
+      "n_total": 61,
+      "n_container": 19,
+      "n_tanker": 21,
+      "n_dry_bulk": 15,
+      "capacity": 2736152
+    },
+    {
+      "day": "2021-03-20",
+      "n_total": 54,
+      "n_container": 16,
+      "n_tanker": 17,
+      "n_dry_bulk": 13,
+      "capacity": 2772477
+    },
+    {
+      "day": "2021-03-21",
+      "n_total": 48,
+      "n_container": 14,
+      "n_tanker": 15,
+      "n_dry_bulk": 12,
+      "capacity": 2233495
+    },
+    {
+      "day": "2021-03-22",
+      "n_total": 59,
+      "n_container": 13,
+      "n_tanker": 22,
+      "n_dry_bulk": 15,
+      "capacity": 2896830
+    },
+    {
+      "day": "2021-03-23",
+      "n_total": 38,
+      "n_container": 20,
+      "n_tanker": 4,
+      "n_dry_bulk": 3,
+      "capacity": 1390965
+    },
+    {
+      "day": "2021-03-24",
+      "n_total": 14,
+      "n_container": 5,
+      "n_tanker": 4,
+      "n_dry_bulk": 2,
+      "capacity": 291050
+    },
+    {
+      "day": "2021-03-25",
+      "n_total": 2,
+      "n_container": 2,
+      "n_tanker": 0,
+      "n_dry_bulk": 0,
+      "capacity": 43428
+    },
+    {
+      "day": "2021-03-26",
+      "n_total": 9,
+      "n_container": 5,
+      "n_tanker": 2,
+      "n_dry_bulk": 0,
+      "capacity": 242647
+    },
+    {
+      "day": "2021-03-27",
+      "n_total": 9,
+      "n_container": 2,
+      "n_tanker": 3,
+      "n_dry_bulk": 1,
+      "capacity": 393392
+    },
+    {
+      "day": "2021-03-28",
+      "n_total": 10,
+      "n_container": 4,
+      "n_tanker": 3,
+      "n_dry_bulk": 1,
+      "capacity": 325106
+    },
+    {
+      "day": "2021-03-29",
+      "n_total": 33,
+      "n_container": 4,
+      "n_tanker": 12,
+      "n_dry_bulk": 6,
+      "capacity": 556142
+    },
+    {
+      "day": "2021-03-30",
+      "n_total": 65,
+      "n_container": 36,
+      "n_tanker": 16,
+      "n_dry_bulk": 4,
+      "capacity": 4315530
+    },
+    {
+      "day": "2021-03-31",
+      "n_total": 63,
+      "n_container": 12,
+      "n_tanker": 14,
+      "n_dry_bulk": 23,
+      "capacity": 2934788
+    },
+    {
+      "day": "2021-04-01",
+      "n_total": 77,
+      "n_container": 34,
+      "n_tanker": 19,
+      "n_dry_bulk": 15,
+      "capacity": 3735756
+    },
+    {
+      "day": "2021-04-02",
+      "n_total": 77,
+      "n_container": 22,
+      "n_tanker": 23,
+      "n_dry_bulk": 24,
+      "capacity": 4063623
+    },
+    {
+      "day": "2021-04-03",
+      "n_total": 88,
+      "n_container": 11,
+      "n_tanker": 30,
+      "n_dry_bulk": 37,
+      "capacity": 4680372
+    },
+    {
+      "day": "2021-04-04",
+      "n_total": 87,
+      "n_container": 25,
+      "n_tanker": 27,
+      "n_dry_bulk": 29,
+      "capacity": 4192716
+    },
+    {
+      "day": "2021-04-05",
+      "n_total": 48,
+      "n_container": 7,
+      "n_tanker": 16,
+      "n_dry_bulk": 15,
+      "capacity": 2325046
+    },
+    {
+      "day": "2021-04-06",
+      "n_total": 78,
+      "n_container": 32,
+      "n_tanker": 13,
+      "n_dry_bulk": 20,
+      "capacity": 3759357
+    },
+    {
+      "day": "2021-04-07",
+      "n_total": 69,
+      "n_container": 16,
+      "n_tanker": 26,
+      "n_dry_bulk": 12,
+      "capacity": 3646339
+    },
+    {
+      "day": "2021-04-08",
+      "n_total": 77,
+      "n_container": 28,
+      "n_tanker": 22,
+      "n_dry_bulk": 13,
+      "capacity": 4388233
+    },
+    {
+      "day": "2021-04-09",
+      "n_total": 88,
+      "n_container": 19,
+      "n_tanker": 26,
+      "n_dry_bulk": 27,
+      "capacity": 4220348
+    },
+    {
+      "day": "2021-04-10",
+      "n_total": 69,
+      "n_container": 12,
+      "n_tanker": 21,
+      "n_dry_bulk": 24,
+      "capacity": 3219054
+    },
+    {
+      "day": "2021-04-11",
+      "n_total": 68,
+      "n_container": 19,
+      "n_tanker": 14,
+      "n_dry_bulk": 19,
+      "capacity": 2507527
+    },
+    {
+      "day": "2021-04-12",
+      "n_total": 45,
+      "n_container": 15,
+      "n_tanker": 15,
+      "n_dry_bulk": 4,
+      "capacity": 2084339
+    },
+    {
+      "day": "2021-04-13",
+      "n_total": 46,
+      "n_container": 15,
+      "n_tanker": 10,
+      "n_dry_bulk": 12,
+      "capacity": 2256510
+    },
+    {
+      "day": "2021-04-14",
+      "n_total": 50,
+      "n_container": 14,
+      "n_tanker": 12,
+      "n_dry_bulk": 15,
+      "capacity": 2252776
+    },
+    {
+      "day": "2021-04-15",
+      "n_total": 48,
+      "n_container": 14,
+      "n_tanker": 12,
+      "n_dry_bulk": 15,
+      "capacity": 2262535
+    },
+    {
+      "day": "2021-04-16",
+      "n_total": 55,
+      "n_container": 16,
+      "n_tanker": 13,
+      "n_dry_bulk": 17,
+      "capacity": 2704564
+    },
+    {
+      "day": "2021-04-17",
+      "n_total": 54,
+      "n_container": 16,
+      "n_tanker": 18,
+      "n_dry_bulk": 13,
+      "capacity": 2905351
+    },
+    {
+      "day": "2021-04-18",
+      "n_total": 48,
+      "n_container": 20,
+      "n_tanker": 11,
+      "n_dry_bulk": 13,
+      "capacity": 2946877
+    },
+    {
+      "day": "2021-04-19",
+      "n_total": 59,
+      "n_container": 16,
+      "n_tanker": 19,
+      "n_dry_bulk": 15,
+      "capacity": 2545207
+    }
+  ]
+}

@@ -50,6 +50,7 @@ def dependency_rows(
     codes: tuple[str, ...],
     sources: tuple[str, ...],
     min_import_kusd: float,
+    importers: tuple[str, ...] | None = None,
 ) -> list[tuple]:
     """Per importer: share of basket imports from the disrupted sources, plus HHI.
 
@@ -60,12 +61,22 @@ def dependency_rows(
     code_list = ",".join(f"'{c}'" for c in codes)
     source_list = ",".join(f"'{s}'" for s in sources)
 
+    # Restrict to the importer side a route actually serves. Without this, a Suez
+    # disruption would score US imports from Asia, which cross the Pacific and
+    # never approach the canal.
+    importer_clause = (
+        "AND importer IN (" + ",".join(f"'{i}'" for i in importers) + ")"
+        if importers
+        else ""
+    )
+
     return con.execute(
         f"""
         WITH basket AS (
             SELECT importer, supplier, SUM(value_kusd) AS v
             FROM '{paths.ddr}'
             WHERE hs6 IN ({code_list})
+            {importer_clause}
             GROUP BY 1, 2
         ),
         totals AS (
@@ -88,6 +99,17 @@ def dependency_rows(
         ORDER BY ddr DESC
         """
     ).fetchall()
+
+
+def world_basket_total(
+    con: duckdb.DuckDBPyConnection, paths: ArtifactPaths, codes: tuple[str, ...]
+) -> float:
+    """Total world trade in the basket, for scaling the materiality floor."""
+    code_list = ",".join(f"'{c}'" for c in codes)
+    total = con.execute(
+        f"SELECT SUM(value_kusd) FROM '{paths.flows}' WHERE hs6 IN ({code_list})"
+    ).fetchone()[0]
+    return float(total or 0.0)
 
 
 def supplier_shares(

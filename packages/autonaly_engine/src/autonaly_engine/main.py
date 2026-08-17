@@ -19,7 +19,13 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from .scoring import Severity, exposure_score, substitution_capacity
-from .store import connect, dependency_rows, importer_supplier_share, supplier_shares
+from .store import (
+    connect,
+    dependency_rows,
+    importer_supplier_share,
+    supplier_shares,
+    world_basket_total,
+)
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +38,13 @@ DEFAULT_VERSION, DEFAULT_YEAR = "V202601", 2024
 # is topped by micro-importers at ~100% dependency (Armenia, $60m of wheat)
 # while Egypt — 77% dependent on $5.2bn — falls off the page entirely.
 DEFAULT_MIN_IMPORT_KUSD = 100_000.0
+
+# A flat floor cannot work across baskets spanning three orders of magnitude:
+# $100m is trivial against $1.5tn of crude and enormous against $5bn of magnets.
+# So the floor also scales with the basket's world trade. At 5 basis points, a
+# Hormuz energy ranking stops being topped by Seychelles ($0.3bn) while a
+# rare-earth ranking keeps every meaningful importer.
+MATERIALITY_BPS_OF_WORLD_TRADE = 5.0
 
 app = FastAPI(
     title="Autonaly exposure engine",
@@ -59,6 +72,40 @@ class ExposureRequest(BaseModel):
     severity: SeverityInput = Field(default_factory=SeverityInput)
     top_n: int = Field(default=20, ge=1, le=200)
     min_import_kusd: float = DEFAULT_MIN_IMPORT_KUSD
+    importers: list[str] | None = Field(
+        default=None,
+        description="Restrict to these importers. None means global.",
+    )
+    attenuation: float = Field(
+        default=1.0,
+        ge=0,
+        le=1,
+        description=(
+            "Scales severity when disrupted cargo has an alternative route. 1.0 is "
+            "a true cutoff; the chokepoint route supplies the right value."
+        ),
+    )
+    version: str = DEFAULT_VERSION
+    year: int = DEFAULT_YEAR
+
+
+class ChokepointRequest(BaseModel):
+    """The chokepoint route (hackathon.md §4).
+
+    The caller names a chokepoint and an observed transit reduction; the routing
+    table supplies the trade geography and whether a bypass exists. Keeping this
+    a distinct endpoint means the agent cannot accidentally score a chokepoint as
+    though it were a supplier embargo.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    event_key: str
+    chokepoint: str
+    transit_reduction: float = Field(ge=0, le=1)
+    duration_months: int = Field(default=1, ge=0, le=120)
+    severity_label: str = "observed"
+    top_n: int = Field(default=20, ge=1, le=200)
     version: str = DEFAULT_VERSION
     year: int = DEFAULT_YEAR
 
@@ -108,15 +155,28 @@ def compute_exposure(request: ExposureRequest) -> Rankings:
 
     severity = Severity(
         label=request.severity.label,
-        transit_reduction=request.severity.transit_reduction,
+        transit_reduction=request.severity.transit_reduction * request.attenuation,
         duration_months=request.severity.duration_months,
     )
 
     con, paths = connect(request.version, request.year)
     started = datetime.now(UTC)
 
+    world_total = world_basket_total(con, paths, codes)
+    floor = max(
+        request.min_import_kusd,
+        world_total * MATERIALITY_BPS_OF_WORLD_TRADE / 10_000.0,
+    )
+
     try:
-        rows = dependency_rows(con, paths, codes, sources, request.min_import_kusd)
+        rows = dependency_rows(
+            con,
+            paths,
+            codes,
+            sources,
+            floor,
+            importers=tuple(request.importers) if request.importers else None,
+        )
     except duckdb.Error as exc:  # pragma: no cover - surfaced as 503 for the agent
         raise HTTPException(status_code=503, detail=f"artifacts unavailable: {exc}") from exc
 
@@ -164,6 +224,67 @@ def compute_exposure(request: ExposureRequest) -> Rankings:
         largest_absolute_exposure=largest.country if largest else None,
         winners=winners,
         methodology_version=METHODOLOGY_VERSION,
+    )
+
+
+@app.get("/chokepoints")
+def list_chokepoints() -> dict[str, list[dict]]:
+    """Routing table, so the agent discovers valid chokepoints rather than guessing."""
+    from autonaly_core.chokepoints import CHOKEPOINTS
+
+    return {
+        "chokepoints": [
+            {
+                "key": c.key,
+                "label": c.label,
+                "portwatch_name": c.portwatch_name,
+                "baskets": list(c.baskets),
+                "reroute": c.reroute.value,
+                "attenuation": c.attenuation(),
+                "global_exposure": c.importer_filter is None,
+                "note": c.note,
+            }
+            for c in CHOKEPOINTS
+        ]
+    }
+
+
+@app.post("/chokepoint", response_model=Rankings)
+def compute_chokepoint_exposure(request: ChokepointRequest) -> Rankings:
+    """Score a chokepoint disruption from an observed transit reduction.
+
+    Delegates to /exposure with the geography and bypass attenuation the routing
+    table supplies — so a Suez transit collapse and an equal Hormuz collapse do
+    not produce the same numbers, because only one of them can be sailed around.
+    """
+    from autonaly_core.chokepoints import BY_KEY as CHOKEPOINT_KEYS
+
+    if request.chokepoint not in CHOKEPOINT_KEYS:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"unknown chokepoint {request.chokepoint!r}; "
+                f"valid keys: {sorted(CHOKEPOINT_KEYS)}"
+            ),
+        )
+
+    cp = CHOKEPOINT_KEYS[request.chokepoint]
+    return compute_exposure(
+        ExposureRequest(
+            event_key=request.event_key,
+            sources=list(cp.source_countries),
+            baskets=list(cp.baskets),
+            severity=SeverityInput(
+                label=request.severity_label,
+                transit_reduction=request.transit_reduction,
+                duration_months=request.duration_months,
+            ),
+            top_n=request.top_n,
+            importers=list(cp.importer_filter) if cp.importer_filter else None,
+            attenuation=cp.attenuation(),
+            version=request.version,
+            year=request.year,
+        )
     )
 
 
