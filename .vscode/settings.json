@@ -1,0 +1,14 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.analysis.extraPaths": [
+    "packages/autonaly_core/src",
+    "packages/autonaly_pipeline/src",
+    "packages/autonaly_engine/src",
+    "packages/autonaly_agent/src",
+    "packages/autonaly_ingest/src"
+  ],
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.egg-info": true
+  }
+}

@@ -73,7 +73,7 @@ def check_pubsub() -> str:
 
 @leg("firestore (emulator)")
 def check_firestore() -> str:
-    from autonaly_core import build_review_queue, get_settings
+    from autonaly_core import build_review_queue
     from autonaly_core.schema import (
         BriefingRecord,
         BriefingStatus,
@@ -109,20 +109,17 @@ def check_firestore() -> str:
 
 @leg("vertex / gemini (REAL — no emulator exists)")
 def check_vertex() -> str:
+    from autonaly_core import get_settings
     from google import genai
     from pydantic import BaseModel
 
-    from autonaly_core import get_settings
-
     s = get_settings()
-    client = genai.Client(vertexai=True, project=s.project_id, location=s.location)
+    client = genai.Client(vertexai=True, project=s.project_id, location=s.vertex_location)
 
-    available = sorted(
-        m.name.split("/")[-1]
-        for m in client.models.list()
-        if "generateContent" in (getattr(m, "supported_actions", None) or ["generateContent"])
-    )
-    flash = [m for m in available if "flash" in m]
+    # Eligibility guard: hackathon.md §2 requires Gemini 3.5+. Fail loudly rather
+    # than discover it in the submission review.
+    version = s.gemini_model.removeprefix("gemini-").split("-")[0]
+    assert float(version) >= 3.5, f"{s.gemini_model} violates the Gemini 3.5+ requirement"
 
     class Classification(BaseModel):
         in_scope: bool
@@ -138,8 +135,8 @@ def check_vertex() -> str:
     )
     parsed = Classification.model_validate_json(response.text)
     return (
-        f"model={s.gemini_model} structured-output OK (in_scope={parsed.in_scope}); "
-        f"{len(available)} models visible, flash variants: {', '.join(flash[:4]) or 'none'}"
+        f"model={s.gemini_model} @ {s.vertex_location} — structured output OK "
+        f"(in_scope={parsed.in_scope}, commodity={parsed.commodity!r})"
     )
 
 
