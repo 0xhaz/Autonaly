@@ -1,3 +1,11 @@
+# Internal planning documents — deliberately not published.
+# These carry product strategy, monetisation, kill criteria and competitive
+# analysis. The public-facing equivalents are README.md and METHODOLOGY.md.
+architecture.md
+hackathon.md
+techstacks.md
+workplan.md
+
 # secrets / env
 .env
 .env.gcp
