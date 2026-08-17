@@ -219,8 +219,20 @@ class BriefingRecord(BaseModel):
     event_key: str
     title: str
     status: BriefingStatus = BriefingStatus.PENDING
+    scoring: Scoring = Scoring.COMPUTED
+    """D8's two rendering classes. `curated` means no computed score, and the
+    briefing must say why — the honest outcome when severity cannot be
+    established from observation."""
+
     narrative: str
     draft: EventDraft
-    rankings: Rankings
+    rankings: Rankings | None = None
+    """None on a `curated` briefing. A degraded data feed must produce no score
+    rather than a plausible-looking one."""
+
+    review_note: str | None = None
+    """What the human reviewer needs to know before approving — most importantly
+    any data-quality warning that blocked scoring."""
+
     created_at: datetime
     published_at: datetime | None = None

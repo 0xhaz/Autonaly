@@ -227,6 +227,42 @@ def compute_exposure(request: ExposureRequest) -> Rankings:
     )
 
 
+@app.get("/concentration/{basket}")
+def basket_concentration(basket: str, top_n: int = 8) -> dict:
+    """Who dominates world exports of a basket.
+
+    The export-restriction route needs this before it can score anything: a
+    signal says "China restricts rare-earth exports" and the agent must resolve
+    that to the disrupted origin and the basket where control actually binds.
+    Returning it from the engine keeps the figures deterministic rather than
+    recalled by a model.
+    """
+    from autonaly_core.baskets import BY_KEY
+
+    if basket not in BY_KEY:
+        raise HTTPException(
+            status_code=422,
+            detail=f"unknown basket {basket!r}; valid keys: {sorted(BY_KEY)}",
+        )
+
+    spec = BY_KEY[basket]
+    con, paths = connect(DEFAULT_VERSION, DEFAULT_YEAR)
+    shares = supplier_shares(con, paths, spec.codes)
+    world = world_basket_total(con, paths, spec.codes)
+
+    ranked = sorted(shares.items(), key=lambda kv: kv[1], reverse=True)[:top_n]
+    return {
+        "basket": basket,
+        "label": spec.label,
+        "world_trade_kusd": round(world, 1),
+        "hhi": round(sum(s * s for s in shares.values()), 4),
+        "top_exporters": [
+            {"country": c, "world_share": round(s, 4)} for c, s in ranked
+        ],
+        "methodology_version": METHODOLOGY_VERSION,
+    }
+
+
 @app.get("/chokepoints")
 def list_chokepoints() -> dict[str, list[dict]]:
     """Routing table, so the agent discovers valid chokepoints rather than guessing."""
