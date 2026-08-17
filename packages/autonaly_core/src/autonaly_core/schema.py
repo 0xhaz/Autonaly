@@ -188,6 +188,14 @@ class Rankings(BaseModel):
     affected: list[AffectedCountry]
     """Ranked by exposure score, i.e. by *intensity* of dependency."""
 
+    baskets: list[str] = Field(default_factory=list)
+    """Basket keys this ranking was computed over. Carried so a reader can
+    interrogate the same commodity set the score was built from, rather than
+    guessing it from the narrative."""
+
+    sources: list[str] = Field(default_factory=list)
+    """The disrupted origins, as ISO3 codes."""
+
     largest_absolute_exposure: str | None = Field(
         default=None,
         description=(

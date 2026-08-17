@@ -21,6 +21,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from .scoring import Severity, exposure_score, substitution_capacity
 from .store import (
     connect,
+    country_export_destinations,
+    country_import_sources,
+    country_totals,
     dependency_rows,
     importer_supplier_share,
     supplier_shares,
@@ -221,6 +224,8 @@ def compute_exposure(request: ExposureRequest) -> Rankings:
         event_key=request.event_key,
         severity_label=severity.label,
         affected=affected,
+        baskets=list(request.baskets),
+        sources=list(sources),
         largest_absolute_exposure=largest.country if largest else None,
         winners=winners,
         methodology_version=METHODOLOGY_VERSION,
@@ -258,6 +263,68 @@ def basket_concentration(basket: str, top_n: int = 8) -> dict:
         "hhi": round(sum(s * s for s in shares.values()), 4),
         "top_exporters": [
             {"country": c, "world_share": round(s, 4)} for c, s in ranked
+        ],
+        "methodology_version": METHODOLOGY_VERSION,
+    }
+
+
+@app.get("/country/{iso3}")
+def country_profile(
+    iso3: str,
+    baskets: str,
+    sources: str = "",
+    top_n: int = 8,
+    version: str = DEFAULT_VERSION,
+    year: int = DEFAULT_YEAR,
+) -> dict:
+    """Bilateral trade profile for one country in a basket set.
+
+    Backs click-to-inspect on the map. A ranking answers "who is exposed"; this
+    answers "why" — which suppliers a country actually depends on, how much of
+    that sits with the disrupted origins, and what the country supplies to others
+    in the same basket.
+
+    Args:
+        iso3: Country code.
+        baskets: Comma-separated basket keys.
+        sources: Comma-separated ISO3 codes treated as disrupted, for shading.
+    """
+    from autonaly_core.baskets import BY_KEY
+
+    keys = [k for k in baskets.split(",") if k]
+    unknown = [k for k in keys if k not in BY_KEY]
+    if not keys or unknown:
+        raise HTTPException(
+            status_code=422, detail=f"unknown or empty baskets {unknown or keys}"
+        )
+
+    codes = tuple(sorted({c for k in keys for c in BY_KEY[k].codes}))
+    disrupted = {s for s in sources.split(",") if s}
+
+    con, paths = connect(version, year)
+    imports = country_import_sources(con, paths, codes, iso3, top_n)
+    exports = country_export_destinations(con, paths, codes, iso3, top_n)
+    total_imports, total_exports, world_share = country_totals(con, paths, codes, iso3)
+
+    return {
+        "country": iso3,
+        "baskets": keys,
+        "basket_labels": [BY_KEY[k].label for k in keys],
+        "total_imports_kusd": round(total_imports, 1),
+        "total_exports_kusd": round(total_exports, 1),
+        "world_export_share": round(world_share, 4),
+        "import_sources": [
+            {
+                "country": c,
+                "value_kusd": round(v, 1),
+                "share": round(s, 4),
+                "disrupted": c in disrupted,
+            }
+            for c, v, s in imports
+        ],
+        "export_destinations": [
+            {"country": c, "value_kusd": round(v, 1), "share": round(s, 4)}
+            for c, v, s in exports
         ],
         "methodology_version": METHODOLOGY_VERSION,
     }

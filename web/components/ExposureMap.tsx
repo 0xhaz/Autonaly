@@ -40,7 +40,11 @@ const MAPLIBRE_URL = "/vendor/maplibre/maplibre-gl.mjs";
 // an absolute scale the whole map renders near-black — technically faithful and
 // completely unreadable. The legend below the map states the range so the
 // shading can never imply a severity the numbers do not support.
-const RAMP_COLORS = ["#1b2735", "#1d3a5c", "#1f5c86", "#2b83a6", "#e8a33d", "#d1495b"];
+// Single-hue sequential blue, dark->light for a dark surface, so "near zero"
+// recedes toward the background. The earlier ramp ran blue->teal->amber->red,
+// which is the rainbow-for-magnitude anti-pattern: multi-hue ramps invent
+// category boundaries the data does not have.
+const RAMP_COLORS = ["#104281", "#184f95", "#256abf", "#3987e5", "#6da7ec", "#9ec5f4"];
 
 // Never stretch a trivial range into a full-spectrum map.
 const MIN_DOMAIN = 5;
@@ -62,12 +66,22 @@ interface WorldFeature {
 export default function ExposureMap({
   affected,
   highlight,
+  selected,
+  onSelect,
 }: {
   affected: AffectedCountry[];
   highlight?: string | null;
+  selected?: string | null;
+  onSelect?: (iso3: string) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibre>(null);
+  // Held in a ref so a new callback identity never rebuilds the map. Assigned in
+  // an effect, since writing a ref during render is not allowed.
+  const onSelectRef = useRef(onSelect);
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
   const [world, setWorld] = useState<{ features: WorldFeature[] } | null>(null);
 
   useEffect(() => {
@@ -151,6 +165,15 @@ export default function ExposureMap({
               },
             ]
           : []),
+        // Declared in the style rather than added afterwards: addLayer before
+        // the style finishes loading throws "Style is not done loading".
+        {
+          id: "selection",
+          type: "line",
+          source: "world",
+          filter: ["==", ["get", "iso3"], selected ?? "__none__"],
+          paint: { "line-color": "#e8a33d", "line-width": 2 },
+        },
       ],
     };
 
@@ -188,6 +211,15 @@ export default function ExposureMap({
       popup.remove();
     });
 
+    m.on("click", "countries", (event: { features?: unknown[] }) => {
+      const feature = event.features?.[0] as
+        | { properties: Record<string, unknown> }
+        | undefined;
+      const iso3 = feature?.properties?.iso3;
+      if (typeof iso3 === "string") onSelectRef.current?.(iso3);
+    });
+
+
     })();
 
     return () => {
@@ -201,23 +233,54 @@ export default function ExposureMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world]);
 
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    // The style can still be loading when a selection arrives (the initial
+    // selection is set before first paint), and setFilter throws with
+    // "Style is not done loading" — apply it on `idle` in that case.
+    const apply = () => {
+      if (!map.current?.getLayer?.("selection")) return;
+      try {
+        map.current.setFilter("selection", [
+          "==",
+          ["get", "iso3"],
+          selected ?? "__none__",
+        ]);
+      } catch {
+        // A selection outline is decoration. Losing it must never surface as a
+        // page error — the panel below already states which country is selected.
+      }
+    };
+    if (m.isStyleLoaded()) apply();
+    else m.once("idle", apply);
+  }, [selected, world]);
+
   const domainMax = Math.max(MIN_DOMAIN, ...affected.map((a) => a.score ?? 0));
 
   return (
     <div className="space-y-2">
       <div
         ref={container}
-        className="h-[380px] w-full overflow-hidden rounded-lg"
+        className="h-[520px] w-full overflow-hidden rounded-lg"
         style={{ border: "1px solid var(--line)" }}
       />
-      <div className="flex items-center gap-3 text-xs" style={{ color: "var(--muted)" }}>
-        <span>exposure score 0</span>
-        <span
-          className="h-2 w-40 rounded-sm"
-          style={{ background: `linear-gradient(to right, ${RAMP_COLORS.join(",")})` }}
-        />
-        <span className="mono">{domainMax.toFixed(1)}</span>
-        <span className="ml-2">· white outline = largest absolute value at risk</span>
+      <div
+        className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]"
+        style={{ color: "var(--muted)" }}
+      >
+        <span className="flex items-center gap-2">
+          <span>exposure score</span>
+          <span className="mono">0</span>
+          <span
+            className="h-2 w-32 rounded-sm"
+            style={{ background: `linear-gradient(to right, ${RAMP_COLORS.join(",")})` }}
+          />
+          <span className="mono">{domainMax.toFixed(1)}</span>
+        </span>
+        <span>· white outline = largest value at risk</span>
+        <span style={{ color: "#e8a33d" }}>· amber = selected</span>
+        <span className="ml-auto">click any country to inspect</span>
       </div>
     </div>
   );

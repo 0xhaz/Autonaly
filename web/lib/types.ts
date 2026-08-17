@@ -29,6 +29,10 @@ export interface Rankings {
   event_key: string;
   severity_label: string;
   affected: AffectedCountry[];
+  /** Basket keys and disrupted origins the ranking was computed over, so the
+   *  inspect panel can query the same commodity set. */
+  baskets?: string[];
+  sources?: string[];
   largest_absolute_exposure: string | null;
   winners: Winner[];
   methodology_version: string;

@@ -2,9 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { approve, reject } from "@/app/actions";
-import ExposureMap from "@/components/ExposureMap";
+import BriefingWorkspace from "@/components/BriefingWorkspace";
 import { getBriefing } from "@/lib/firestore";
-import { formatKusd, formatPercent } from "@/lib/types";
+import { formatPercent } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,6 @@ export default async function BriefingPage({
   if (!briefing) notFound();
 
   const rankings = briefing.rankings;
-  const largest = rankings?.largest_absolute_exposure ?? null;
   const isPending = briefing.status === "pending";
 
   return (
@@ -126,61 +125,15 @@ export default async function BriefingPage({
       )}
 
       {rankings && rankings.affected.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
-            Exposure
-          </h2>
-          <ExposureMap affected={rankings.affected} highlight={largest} />
-          <p className="text-xs" style={{ color: "var(--muted)" }}>
-            Shading is exposure score (dependency intensity). The outlined country carries the
-            largest absolute value at risk — the two frequently disagree, which is why both are shown.
-          </p>
-        </section>
+        <BriefingWorkspace rankings={rankings} sources={rankings.sources ?? []} />
       )}
 
       <section className="panel p-6">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
+          Analyst briefing
+        </h2>
         <div className="narrative">{renderNarrative(briefing.narrative)}</div>
       </section>
-
-      {rankings && rankings.affected.length > 0 && (
-        <section className="panel overflow-hidden">
-          <div className="border-b p-4" style={{ borderColor: "var(--line)" }}>
-            <h2 className="text-sm font-semibold">Ranked exposure</h2>
-            <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
-              Every score is shown with the ratios behind it. Ordered by intensity.
-            </p>
-          </div>
-          <div className="overflow-x-auto p-2">
-            <table className="rank">
-              <thead>
-                <tr>
-                  <th>Country</th>
-                  <th>Score</th>
-                  <th>Dependency</th>
-                  <th>Concentration</th>
-                  <th>Value at risk</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rankings.affected.map((a) => (
-                  <tr key={a.country}>
-                    <td className="mono font-semibold">
-                      {a.country}
-                      {a.country === largest && (
-                        <span className="ml-2 chip chip-curated">largest</span>
-                      )}
-                    </td>
-                    <td className="mono">{a.score?.toFixed(1) ?? "—"}</td>
-                    <td className="mono">{formatPercent(a.ddr)}</td>
-                    <td className="mono">{a.hhi?.toFixed(3) ?? "—"}</td>
-                    <td className="mono">{formatKusd(a.value_at_risk_kusd)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
 
       {rankings && rankings.winners.length > 0 && (
         <section className="panel p-6">

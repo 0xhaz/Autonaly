@@ -129,6 +129,77 @@ def supplier_shares(
     return {exporter: share for exporter, share in rows}
 
 
+def country_import_sources(
+    con: duckdb.DuckDBPyConnection,
+    paths: ArtifactPaths,
+    codes: tuple[str, ...],
+    importer: str,
+    limit: int,
+) -> list[tuple]:
+    """Where a country buys the basket from, largest share first."""
+    code_list = ",".join(f"'{c}'" for c in codes)
+    return con.execute(
+        f"""
+        WITH basket AS (
+            SELECT supplier, SUM(value_kusd) AS v
+            FROM '{paths.ddr}'
+            WHERE hs6 IN ({code_list}) AND importer = '{importer}'
+            GROUP BY 1
+        )
+        SELECT supplier, v, v / SUM(v) OVER () AS share
+        FROM basket ORDER BY v DESC LIMIT {limit}
+        """
+    ).fetchall()
+
+
+def country_export_destinations(
+    con: duckdb.DuckDBPyConnection,
+    paths: ArtifactPaths,
+    codes: tuple[str, ...],
+    exporter: str,
+    limit: int,
+) -> list[tuple]:
+    """Where a country sells the basket, largest share first.
+
+    The other half of the dependency picture: a country can be exposed as a buyer
+    and simultaneously matter to the world as a seller.
+    """
+    code_list = ",".join(f"'{c}'" for c in codes)
+    return con.execute(
+        f"""
+        WITH basket AS (
+            SELECT importer AS destination, SUM(value_kusd) AS v
+            FROM '{paths.flows}'
+            WHERE hs6 IN ({code_list}) AND exporter = '{exporter}'
+            GROUP BY 1
+        )
+        SELECT destination, v, v / SUM(v) OVER () AS share
+        FROM basket ORDER BY v DESC LIMIT {limit}
+        """
+    ).fetchall()
+
+
+def country_totals(
+    con: duckdb.DuckDBPyConnection,
+    paths: ArtifactPaths,
+    codes: tuple[str, ...],
+    country: str,
+) -> tuple[float, float, float]:
+    """(imports, exports, world export share) for the basket, in kUSD."""
+    code_list = ",".join(f"'{c}'" for c in codes)
+    row = con.execute(
+        f"""
+        SELECT
+            COALESCE(SUM(CASE WHEN importer = '{country}' THEN value_kusd END), 0),
+            COALESCE(SUM(CASE WHEN exporter = '{country}' THEN value_kusd END), 0),
+            COALESCE(SUM(value_kusd), 0)
+        FROM '{paths.flows}' WHERE hs6 IN ({code_list})
+        """
+    ).fetchone()
+    imports, exports, world = row
+    return float(imports), float(exports), (float(exports) / world if world else 0.0)
+
+
 def importer_supplier_share(
     con: duckdb.DuckDBPyConnection,
     paths: ArtifactPaths,
