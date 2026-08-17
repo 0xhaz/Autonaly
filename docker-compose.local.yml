@@ -1,0 +1,37 @@
+# Local GCP substitutes (workplan.md §1).
+# Pub/Sub and Firestore have official emulators that the client libraries pick
+# up via env var, so application code is identical here and on GCP.
+# There is no emulator for Vertex/Gemini — that stays a real API call.
+
+services:
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    container_name: autonaly-pubsub
+    command: >
+      gcloud beta emulators pubsub start
+      --project=autonaly-hackathon
+      --host-port=0.0.0.0:8085
+    ports:
+      - "8085:8085"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8085/"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  firestore:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    container_name: autonaly-firestore
+    command: >
+      gcloud beta emulators firestore start
+      --project=autonaly-hackathon
+      --host-port=0.0.0.0:8086
+    ports:
+      - "8086:8086"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8086/"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s

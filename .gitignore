@@ -1,0 +1,36 @@
+# secrets / env
+.env
+.env.gcp
+*.pem
+*-key.json
+service-account*.json
+
+# data + artifacts (never committed — see workplan.md §2)
+data/
+artifacts/
+!artifacts/.gitkeep
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.egg-info/
+dist/
+build/
+
+# node
+node_modules/
+.next/
+out/
+.vercel
+
+# emulator state
+.emulator/
+firestore-debug.log
+pubsub-debug.log
+
+# os
+.DS_Store
