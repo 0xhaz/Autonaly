@@ -46,6 +46,15 @@ const MAPLIBRE_URL = "/vendor/maplibre/maplibre-gl.mjs";
 // category boundaries the data does not have.
 const RAMP_COLORS = ["#104281", "#184f95", "#256abf", "#3987e5", "#6da7ec", "#9ec5f4"];
 
+// Land outside the ranking has to be visible against the water without competing
+// with the ramp. Lightness alone cannot do that job here — a light neutral made
+// unranked countries read as *more* prominent than genuinely low-scoring ones,
+// inverting the meaning. So hue carries the distinction: grey means "not ranked",
+// blue is reserved for magnitude, and lightness varies only within the blue.
+const OCEAN = "#0d1620";
+const UNSCORED = "#333b44";
+const BORDER = "#4a5866";
+
 // Never stretch a trivial range into a full-spectrum map.
 const MIN_DOMAIN = 5;
 
@@ -135,7 +144,7 @@ export default function ExposureMap({
       // track the country under the cursor.
       sources: { world: { type: "geojson", data: scored, promoteId: "iso3" } },
       layers: [
-        { id: "bg", type: "background", paint: { "background-color": "#0b0f14" } },
+        { id: "bg", type: "background", paint: { "background-color": OCEAN } },
         {
           id: "countries",
           type: "fill",
@@ -144,7 +153,7 @@ export default function ExposureMap({
             "fill-color": [
               "case",
               ["==", ["get", "scored"], 0],
-              "#131a24",
+              UNSCORED,
               ["interpolate", ["linear"], ["get", "score"], ...rampStops(maxScore)],
             ],
             // Base layer; hover brings a single country forward.
@@ -174,7 +183,7 @@ export default function ExposureMap({
           id: "borders",
           type: "line",
           source: "world",
-          paint: { "line-color": "#2a3a47", "line-width": 0.4 },
+          paint: { "line-color": BORDER, "line-width": 0.5 },
         },
         ...(highlight
           ? [

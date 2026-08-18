@@ -24,7 +24,14 @@ const MAPLIBRE_URL = "/vendor/maplibre/maplibre-gl.mjs";
 // up, and a committed selection holds a deeper blue. Exposure still travels with
 // the country — it is in the hover tooltip and in the drawer — it just no longer
 // paints twenty fills at once.
-const NEUTRAL = "#151d28";
+// Land has to separate from two things at once: the ocean inside the frame and
+// the page behind it. At #151d28 it did neither — the map read as an empty
+// rectangle. Land now sits several steps above the water, and the water sits a
+// step above the page, so the frame has depth without any of it competing with
+// the interaction colours.
+const OCEAN = "#0d1620";
+const NEUTRAL = "#27384c";
+const BORDER = "#42586e";
 const HOVER = "#3987e5";
 const SELECTED = "#1c5cab";
 
@@ -120,7 +127,7 @@ export default function GlobalMap({
           events: { type: "geojson", data: eventPoints },
         },
         layers: [
-          { id: "bg", type: "background", paint: { "background-color": "#0b0f14" } },
+          { id: "bg", type: "background", paint: { "background-color": OCEAN } },
           {
             id: "countries",
             type: "fill",
@@ -155,7 +162,7 @@ export default function GlobalMap({
             id: "borders",
             type: "line",
             source: "world",
-            paint: { "line-color": "#2a3a47", "line-width": 0.4 },
+            paint: { "line-color": BORDER, "line-width": 0.5 },
           },
           // Halo then core, so a marker reads against any shading beneath it.
           {
@@ -186,7 +193,7 @@ export default function GlobalMap({
                 "#d03b3b",
               ],
               "circle-stroke-width": 1.5,
-              "circle-stroke-color": "#0b0f14",
+              "circle-stroke-color": OCEAN,
             },
           },
         ],
