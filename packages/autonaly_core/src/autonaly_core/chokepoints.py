@@ -147,7 +147,10 @@ CHOKEPOINTS: tuple[Chokepoint, ...] = (
         portwatch_name="Bosporus Strait",
         label="Bosporus Strait",
         source_countries=("RUS", "UKR", "ROU", "BGR", "GEO"),
-        baskets=("wheat", "maize", "barley", "crude_oil", "refined_products", "nitrogen_fertilizer"),
+        baskets=(
+            "wheat", "maize", "barley", "crude_oil", "refined_products",
+            "nitrogen_fertilizer",
+        ),
         reroute=Reroute.NONE,
         importer_filter=None,
         note=(
