@@ -208,6 +208,15 @@ export default function GlobalMap({
         center: [30, 32],
         zoom: 1.45,
         attributionControl: false,
+        // Without this the world repeats horizontally as you zoom out, so the
+        // same country appears several times and the event markers duplicate
+        // with it. minZoom keeps the globe filling the frame.
+        //
+        // maxBounds was tried here and removed: combined with a zoom floor it
+        // produced an unsatisfiable constraint and crashed MapLibre's transform
+        // maths on zoom-out.
+        renderWorldCopies: false,
+        minZoom: 1.1,
       });
       map.current = m;
       m.addControl(new maplibre.NavigationControl({ showCompass: false }), "top-right");

@@ -214,6 +214,12 @@ export default function ExposureMap({
       center: [15, 25],
       zoom: 1.05,
       attributionControl: false,
+      // Without this the world repeats horizontally as you zoom out, so the
+      // same country appears several times. minZoom keeps the globe filling
+      // the frame. maxBounds was tried and removed — with a zoom floor it
+      // crashed MapLibre's transform maths.
+      renderWorldCopies: false,
+      minZoom: 1.1,
     });
     map.current = m;
 
