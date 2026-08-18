@@ -1,53 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import CountryDrawer from "@/components/CountryDrawer";
-import GlobalMap, { type LayerToggles, type MapEvent } from "@/components/GlobalMap";
-import type { Briefing } from "@/lib/types";
+import GlobalMap, { type LayerToggles } from "@/components/GlobalMap";
 
 /**
- * The landing surface: a map, and the controls that change what it shows.
+ * The landing surface: an explorable world atlas with optional maritime layers.
  *
- * Summary cards used to sit above the map. They are gone deliberately — a
- * dashboard of headline numbers answers questions nobody had yet, and pushed the
- * one thing worth looking at below the fold. The numbers still exist, on the
- * country a reader actually asked about.
- *
- * Layers are how one map serves several audiences. A general reader wants a
- * clean world. A macro analyst wants the maritime network under it — the lanes,
- * the straits they funnel through, the ports that anchor them — and can switch
- * that on without it being imposed on everyone else.
+ * No exposure, no events, no queue — those are analysis, and analysis lives on
+ * the signed-in dashboard and the review queue. Here a stranger gets general
+ * knowledge: click a country for its profile, toggle the maritime network on.
  */
 
 const LAYER_META: { key: keyof LayerToggles; label: string; hint: string; swatch: string }[] = [
-  {
-    key: "lanes",
-    label: "Shipping lanes",
-    hint: "Indicative maritime routes",
-    swatch: "#a8c8ea",
-  },
-  {
-    key: "ports",
-    label: "Major ports",
-    hint: "300 busiest, sized by vessel traffic",
-    swatch: "#7fb2e8",
-  },
-  {
-    key: "chokepoints",
-    label: "Chokepoints",
-    hint: "28 straits and canals, drawn as rings",
-    swatch: "#e8a33d",
-  },
+  { key: "lanes", label: "Shipping lanes", hint: "Indicative maritime routes", swatch: "#a8c8ea" },
+  { key: "ports", label: "Major ports", hint: "300 busiest, sized by vessel traffic", swatch: "#7fb2e8" },
+  { key: "chokepoints", label: "Chokepoints", hint: "28 straits and canals, drawn as rings", swatch: "#e8a33d" },
 ];
 
-export default function GlobalDashboard({
-  briefings,
-  events,
-}: {
-  briefings: Briefing[];
-  events: MapEvent[];
-}) {
+export default function GlobalDashboard() {
   const [selected, setSelected] = useState<string | null>(null);
   const [layers, setLayers] = useState<LayerToggles>({
     lanes: false,
@@ -55,34 +27,19 @@ export default function GlobalDashboard({
     chokepoints: false,
   });
 
-  // Peak exposure per country, still computed — the drawer and the tooltip use
-  // it even though nothing paints the whole world with it any more.
-  const scores = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const b of briefings) {
-      for (const a of b.rankings?.affected ?? []) {
-        out[a.country] = Math.max(out[a.country] ?? 0, a.score ?? 0);
-      }
-    }
-    return out;
-  }, [briefings]);
-
-  const { baskets, sources } = useMemo(() => {
-    const scored = briefings.filter((b) => b.rankings?.baskets?.length);
-    const widest = scored.sort(
-      (a, b) => b.rankings!.baskets!.length - a.rankings!.baskets!.length,
-    )[0];
-    return {
-      baskets: widest?.rankings?.baskets ?? ["crude_oil"],
-      sources: widest?.rankings?.sources ?? [],
-    };
-  }, [briefings]);
-
-  const exposureFor = (iso3: string) =>
-    briefings
-      .flatMap((b) => b.rankings?.affected ?? [])
-      .filter((a) => a.country === iso3)
-      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+  // The drawer's bilateral view needs a commodity scope. On the atlas that
+  // scope is "everything we model" — the engine's own catalogue, not an
+  // event's basket list.
+  const [allBaskets, setAllBaskets] = useState<string[]>(["crude_oil"]);
+  useEffect(() => {
+    fetch("/api/meta")
+      .then((r) => r.json())
+      .then((meta) => {
+        const keys = (meta.baskets ?? []).map((b: { key: string }) => b.key);
+        if (keys.length) setAllBaskets(keys);
+      })
+      .catch(() => {});
+  }, []);
 
   const toggle = (key: keyof LayerToggles) =>
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -108,7 +65,9 @@ export default function GlobalDashboard({
               className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-colors"
               style={{
                 border: `1px solid ${on ? meta.swatch : "var(--line)"}`,
-                background: on ? `color-mix(in srgb, ${meta.swatch} 14%, transparent)` : "transparent",
+                background: on
+                  ? `color-mix(in srgb, ${meta.swatch} 14%, transparent)`
+                  : "transparent",
                 color: on ? "var(--text)" : "var(--muted)",
               }}
             >
@@ -122,19 +81,13 @@ export default function GlobalDashboard({
         })}
       </div>
 
-      <GlobalMap
-        scores={scores}
-        events={events}
-        selected={selected}
-        onSelect={setSelected}
-        layers={layers}
-      />
+      <GlobalMap selected={selected} onSelect={setSelected} layers={layers} />
 
       <CountryDrawer
         country={selected}
-        baskets={baskets}
-        sources={sources}
-        exposure={selected ? exposureFor(selected) : undefined}
+        baskets={allBaskets}
+        sources={[]}
+        exposure={undefined}
         onClose={() => setSelected(null)}
       />
     </div>

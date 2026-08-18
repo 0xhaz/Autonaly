@@ -3,15 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * The landing map: every live event on one world view.
+ * The landing map: a world atlas, nothing more.
  *
- * A knowledge platform should open on the world, not on a work queue. Country
- * shading is the *worst* exposure any current event puts on that country — a max
- * rather than a sum, because two unrelated crises scoring 30 each do not make a
- * 60, and adding them would invent a severity nothing measured.
- *
- * Event markers sit at the chokepoint's real coordinates, so "where is this
- * happening" is answered by the map rather than by reading a title.
+ * Deliberately carries no exposure shading and no event markers — those are
+ * analysis, and analysis lives behind sign-in on the dashboard and the review
+ * queue. A stranger landing here gets an explorable world: hover names a
+ * country, click opens its profile, and the optional layers add the maritime
+ * network. General knowledge first; the agent's judgements where they belong.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,16 +35,6 @@ const SELECTED = "#1c5cab";
 
 const EMPTY = { type: "FeatureCollection", features: [] } as const;
 
-export interface MapEvent {
-  id: string;
-  title: string;
-  status: string;
-  scoring: string;
-  lat: number;
-  lon: number;
-  unscored: boolean;
-}
-
 interface WorldFeature {
   type: "Feature";
   properties: { iso3: string; name: string };
@@ -60,14 +48,10 @@ export interface LayerToggles {
 }
 
 export default function GlobalMap({
-  scores,
-  events,
   selected,
   onSelect,
   layers,
 }: {
-  scores: Record<string, number>;
-  events: MapEvent[];
   selected?: string | null;
   onSelect?: (iso3: string) => void;
   layers: LayerToggles;
@@ -115,36 +99,12 @@ export default function GlobalMap({
       );
       if (disposed || !container.current || map.current) return;
 
-      const scored = {
-        type: "FeatureCollection" as const,
-        features: world.features.map((f) => ({
-          ...f,
-          properties: {
-            ...f.properties,
-            score: scores[f.properties.iso3] ?? 0,
-            scored: scores[f.properties.iso3] !== undefined ? 1 : 0,
-          },
-        })),
-      };
-
-      const eventPoints = {
-        type: "FeatureCollection" as const,
-        features: events
-          .filter((e) => e.lat !== 0 || e.lon !== 0)
-          .map((e) => ({
-            type: "Feature" as const,
-            properties: { id: e.id, title: e.title, unscored: e.unscored ? 1 : 0 },
-            geometry: { type: "Point" as const, coordinates: [e.lon, e.lat] },
-          })),
-      };
-
       const style = {
         version: 8,
         sources: {
           // promoteId makes iso3 the feature id, which is what feature-state
           // needs in order to track which country is under the cursor.
-          world: { type: "geojson", data: scored, promoteId: "iso3" },
-          events: { type: "geojson", data: eventPoints },
+          world: { type: "geojson", data: world, promoteId: "iso3" },
           lanes: { type: "geojson", data: overlays.lanes ?? EMPTY },
           ports: { type: "geojson", data: overlays.ports ?? EMPTY },
           chokepoints: { type: "geojson", data: overlays.chokepoints ?? EMPTY },
@@ -244,38 +204,6 @@ export default function GlobalMap({
             },
           },
 
-          // Halo then core, so a marker reads against any shading beneath it.
-          {
-            id: "event-halo",
-            type: "circle",
-            source: "events",
-            paint: {
-              "circle-radius": 11,
-              "circle-color": [
-                "case",
-                ["==", ["get", "unscored"], 1],
-                "#fab219",
-                "#d03b3b",
-              ],
-              "circle-opacity": 0.18,
-            },
-          },
-          {
-            id: "event-core",
-            type: "circle",
-            source: "events",
-            paint: {
-              "circle-radius": 4.5,
-              "circle-color": [
-                "case",
-                ["==", ["get", "unscored"], 1],
-                "#fab219",
-                "#d03b3b",
-              ],
-              "circle-stroke-width": 1.5,
-              "circle-stroke-color": OCEAN,
-            },
-          },
         ],
       };
 
@@ -328,21 +256,10 @@ export default function GlobalMap({
         setHover(typeof p.iso3 === "string" ? p.iso3 : null);
         showPopup(
           event,
-          `<div style="font:12px ui-sans-serif;color:#0b0f14">
-             <strong>${p.name}</strong><br/>
-             ${p.scored ? `peak exposure ${Number(p.score).toFixed(1)}/100` : "not currently exposed"}
-           </div>`,
+          `<div style="font:12px ui-sans-serif;color:#0b0f14"><strong>${p.name}</strong></div>`,
         );
       });
 
-      m.on("mousemove", "event-core", (event: { features?: unknown[]; lngLat: unknown }) => {
-        const f = event.features?.[0] as { properties: Record<string, unknown> } | undefined;
-        if (!f) return;
-        showPopup(
-          event,
-          `<div style="font:12px ui-sans-serif;color:#0b0f14"><strong>${f.properties.title}</strong></div>`,
-        );
-      });
 
       for (const [layer, label] of [
         ["ports", "port"],
@@ -386,7 +303,7 @@ export default function GlobalMap({
       map.current?.remove();
       map.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [world, overlays]);
 
   useEffect(() => {
@@ -461,8 +378,6 @@ export default function GlobalMap({
           />
           selected
         </span>
-        <span style={{ color: "#d03b3b" }}>● scored event</span>
-        <span style={{ color: "#fab219" }}>● unscored — data quality</span>
         <span className="ml-auto">click any country to inspect</span>
       </div>
     </div>
