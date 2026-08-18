@@ -118,7 +118,9 @@ export default function GlobalMap({
       const style = {
         version: 8,
         sources: {
-          world: { type: "geojson", data: scored },
+          // promoteId makes iso3 the feature id, which is what feature-state
+          // needs in order to track which country is under the cursor.
+          world: { type: "geojson", data: scored, promoteId: "iso3" },
           events: { type: "geojson", data: eventPoints },
         },
         layers: [
@@ -134,7 +136,28 @@ export default function GlobalMap({
                 "#131a24",
                 ["interpolate", ["linear"], ["get", "score"], ...rampStops(maxScore)],
               ],
-              "fill-opacity": 0.92,
+              // The choropleth is a base layer, not the focus. Hovering brings a
+              // country forward rather than leaving every fill shouting at once.
+              "fill-opacity": [
+                "case",
+                ["boolean", ["feature-state", "hover"], false],
+                1,
+                0.55,
+              ],
+            },
+          },
+          {
+            id: "hover-outline",
+            type: "line",
+            source: "world",
+            paint: {
+              "line-color": "#cfe2fb",
+              "line-width": [
+                "case",
+                ["boolean", ["feature-state", "hover"], false],
+                1.6,
+                0,
+              ],
             },
           },
           {
@@ -208,10 +231,21 @@ export default function GlobalMap({
         popup.setLngLat(event.lngLat).setHTML(html).addTo(m);
       };
 
+      let hovered: string | null = null;
+      const setHover = (iso3: string | null) => {
+        if (hovered === iso3) return;
+        if (hovered) m.setFeatureState({ source: "world", id: hovered }, { hover: false });
+        hovered = iso3;
+        if (hovered) m.setFeatureState({ source: "world", id: hovered }, { hover: true });
+      };
+
       m.on("mousemove", "countries", (event: { features?: unknown[]; lngLat: unknown }) => {
-        const f = event.features?.[0] as { properties: Record<string, unknown> } | undefined;
+        const f = event.features?.[0] as
+          | { id?: string; properties: Record<string, unknown> }
+          | undefined;
         if (!f) return;
         const p = f.properties;
+        setHover(typeof p.iso3 === "string" ? p.iso3 : null);
         showPopup(
           event,
           `<div style="font:12px ui-sans-serif;color:#0b0f14">
@@ -232,6 +266,7 @@ export default function GlobalMap({
 
       m.on("mouseleave", "countries", () => {
         m.getCanvas().style.cursor = "";
+        setHover(null);
         popup.remove();
       });
 

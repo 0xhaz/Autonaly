@@ -131,7 +131,9 @@ export default function ExposureMap({
       // No `glyphs` key at all: MapLibre validates the spec strictly, and an
       // explicit `glyphs: undefined` fails as "string expected", aborting the
       // style load and leaving an empty canvas.
-      sources: { world: { type: "geojson", data: scored } },
+      // promoteId makes iso3 the feature id, which feature-state needs to
+      // track the country under the cursor.
+      sources: { world: { type: "geojson", data: scored, promoteId: "iso3" } },
       layers: [
         { id: "bg", type: "background", paint: { "background-color": "#0b0f14" } },
         {
@@ -145,7 +147,27 @@ export default function ExposureMap({
               "#131a24",
               ["interpolate", ["linear"], ["get", "score"], ...rampStops(maxScore)],
             ],
-            "fill-opacity": 0.92,
+            // Base layer; hover brings a single country forward.
+            "fill-opacity": [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              1,
+              0.55,
+            ],
+          },
+        },
+        {
+          id: "hover-outline",
+          type: "line",
+          source: "world",
+          paint: {
+            "line-color": "#cfe2fb",
+            "line-width": [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              1.6,
+              0,
+            ],
           },
         },
         {
@@ -190,10 +212,19 @@ export default function ExposureMap({
 
     const popup = new maplibre.Popup({ closeButton: false, closeOnMove: true });
 
+    let hovered: string | null = null;
+    const setHover = (iso3: string | null) => {
+      if (hovered === iso3) return;
+      if (hovered) m.setFeatureState({ source: "world", id: hovered }, { hover: false });
+      hovered = iso3;
+      if (hovered) m.setFeatureState({ source: "world", id: hovered }, { hover: true });
+    };
+
     m.on("mousemove", "countries", (event: { features?: unknown[]; lngLat: unknown }) => {
       const feature = event.features?.[0] as { properties: Record<string, unknown> } | undefined;
       if (!feature) return;
       const props = feature.properties;
+      setHover(typeof props.iso3 === "string" ? props.iso3 : null);
       m.getCanvas().style.cursor = "pointer";
       popup
         .setLngLat(event.lngLat)
@@ -208,6 +239,7 @@ export default function ExposureMap({
 
     m.on("mouseleave", "countries", () => {
       m.getCanvas().style.cursor = "";
+      setHover(null);
       popup.remove();
     });
 
