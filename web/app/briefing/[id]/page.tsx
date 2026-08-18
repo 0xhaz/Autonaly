@@ -61,7 +61,7 @@ export default async function BriefingPage({
   const isPending = briefing.status === "pending";
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <Link href="/" className="text-sm" style={{ color: "var(--accent)" }}>
         ← review queue
       </Link>

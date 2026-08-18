@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <header className="border-b" style={{ borderColor: "var(--line)" }}>
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="mx-auto flex max-w-[1700px] items-center justify-between px-5 py-3">
             <Link href="/" className="flex items-baseline gap-3">
               <span className="text-lg font-semibold tracking-tight">Autonaly</span>
               <span className="text-xs" style={{ color: "var(--muted)" }}>
@@ -33,9 +33,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </p>
           </div>
         </header>
-        <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+        {/* No max-width here: the landing page is a map and wants the room.
+            Text-heavy pages set their own reading measure. */}
+        <main className="mx-auto max-w-[1700px] px-5 py-5">{children}</main>
         <footer
-          className="mx-auto max-w-6xl px-6 py-8 text-xs"
+          className="mx-auto max-w-[1700px] px-5 py-6 text-xs"
           style={{ color: "var(--muted)" }}
         >
           Data: BACI/CEPII (Etalab 2.0) · UN Global Platform; IMF PortWatch. Exposure
