@@ -35,6 +35,8 @@ const BORDER = "#42586e";
 const HOVER = "#3987e5";
 const SELECTED = "#1c5cab";
 
+const EMPTY = { type: "FeatureCollection", features: [] } as const;
+
 export interface MapEvent {
   id: string;
   title: string;
@@ -51,16 +53,24 @@ interface WorldFeature {
   geometry: unknown;
 }
 
+export interface LayerToggles {
+  lanes: boolean;
+  ports: boolean;
+  chokepoints: boolean;
+}
+
 export default function GlobalMap({
   scores,
   events,
   selected,
   onSelect,
+  layers,
 }: {
   scores: Record<string, number>;
   events: MapEvent[];
   selected?: string | null;
   onSelect?: (iso3: string) => void;
+  layers: LayerToggles;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibre>(null);
@@ -72,12 +82,22 @@ export default function GlobalMap({
     onSelectRef.current = onSelect;
   }, [onSelect]);
 
+  const [overlays, setOverlays] = useState<Record<string, unknown> | null>(null);
+
   useEffect(() => {
     let cancelled = false;
-    fetch("/world.geo.json")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) setWorld(data);
+    Promise.all([
+      fetch("/world.geo.json").then((r) => r.json()),
+      // Optional layers load once and stay in memory; toggling is a visibility
+      // change, not a refetch.
+      fetch("/layers/shipping-lanes.geo.json").then((r) => r.json()).catch(() => null),
+      fetch("/layers/ports.geo.json").then((r) => r.json()).catch(() => null),
+      fetch("/layers/chokepoints.geo.json").then((r) => r.json()).catch(() => null),
+    ])
+      .then(([w, lanes, ports, chokepoints]) => {
+        if (cancelled) return;
+        setOverlays({ lanes, ports, chokepoints });
+        setWorld(w);
       })
       .catch(() => {});
     return () => {
@@ -86,7 +106,7 @@ export default function GlobalMap({
   }, []);
 
   useEffect(() => {
-    if (!container.current || !world || map.current) return;
+    if (!container.current || !world || !overlays || map.current) return;
     let disposed = false;
 
     (async () => {
@@ -125,6 +145,9 @@ export default function GlobalMap({
           // needs in order to track which country is under the cursor.
           world: { type: "geojson", data: scored, promoteId: "iso3" },
           events: { type: "geojson", data: eventPoints },
+          lanes: { type: "geojson", data: overlays.lanes ?? EMPTY },
+          ports: { type: "geojson", data: overlays.ports ?? EMPTY },
+          chokepoints: { type: "geojson", data: overlays.chokepoints ?? EMPTY },
         },
         layers: [
           { id: "bg", type: "background", paint: { "background-color": OCEAN } },
@@ -164,6 +187,61 @@ export default function GlobalMap({
             source: "world",
             paint: { "line-color": BORDER, "line-width": 0.5 },
           },
+          // --- optional layers, hidden until the reader asks for them ---
+          {
+            id: "lanes",
+            type: "line",
+            source: "lanes",
+            layout: { visibility: "none", "line-cap": "round" },
+            paint: {
+              "line-color": "#5b8fc9",
+              "line-width": 0.7,
+              "line-opacity": 0.5,
+              // Dotted, because these are indicative lanes rather than surveyed
+              // routes — a solid line would claim more precision than the data has.
+              "line-dasharray": [2, 2.5],
+            },
+          },
+          {
+            id: "ports",
+            type: "circle",
+            source: "ports",
+            layout: { visibility: "none" },
+            paint: {
+              // Radius carries vessel traffic, so the busiest ports read first.
+              "circle-radius": [
+                "interpolate",
+                ["linear"],
+                ["get", "vessels"],
+                0, 1.6,
+                20000, 3.4,
+                120000, 6,
+              ],
+              "circle-color": "#7fb2e8",
+              "circle-opacity": 0.85,
+              "circle-stroke-width": 0.5,
+              "circle-stroke-color": OCEAN,
+            },
+          },
+          {
+            id: "chokepoints",
+            type: "circle",
+            source: "chokepoints",
+            layout: { visibility: "none" },
+            paint: {
+              // Hollow ring, not a filled dot. Chokepoints would otherwise be the
+              // same amber as an unscored *event* marker, and the two mean very
+              // different things — one is permanent geography, the other is a
+              // briefing that could not be scored. Form separates them where
+              // colour alone would not.
+              "circle-radius": 5.5,
+              "circle-color": "rgba(0,0,0,0)",
+              "circle-stroke-width": 1.6,
+              "circle-stroke-color": "#e8a33d",
+              "circle-opacity": 1,
+            },
+          },
+
           // Halo then core, so a marker reads against any shading beneath it.
           {
             id: "event-halo",
@@ -264,6 +342,30 @@ export default function GlobalMap({
         );
       });
 
+      for (const [layer, label] of [
+        ["ports", "port"],
+        ["chokepoints", "chokepoint"],
+      ] as const) {
+        m.on("mousemove", layer, (event: { features?: unknown[]; lngLat: unknown }) => {
+          const f = event.features?.[0] as
+            | { properties: Record<string, unknown> }
+            | undefined;
+          if (!f) return;
+          const vessels = Number(f.properties.vessels || 0);
+          showPopup(
+            event,
+            `<div style="font:12px ui-sans-serif;color:#0b0f14">
+               <strong>${f.properties.name}</strong><br/>
+               ${label} · ${vessels.toLocaleString()} vessels/yr
+             </div>`,
+          );
+        });
+        m.on("mouseleave", layer, () => {
+          m.getCanvas().style.cursor = "";
+          popup.remove();
+        });
+      }
+
       m.on("mouseleave", "countries", () => {
         m.getCanvas().style.cursor = "";
         setHover(null);
@@ -283,7 +385,25 @@ export default function GlobalMap({
       map.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [world]);
+  }, [world, overlays]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    const apply = () => {
+      const map_ = map.current;
+      if (!map_?.getLayer?.("lanes")) return;
+      for (const [id, on] of [
+        ["lanes", layers.lanes],
+        ["ports", layers.ports],
+        ["chokepoints", layers.chokepoints],
+      ] as const) {
+        map_.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+      }
+    };
+    if (m.isStyleLoaded()) apply();
+    else m.once("idle", apply);
+  }, [layers, world, overlays]);
 
   useEffect(() => {
     const m = map.current;

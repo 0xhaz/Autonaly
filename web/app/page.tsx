@@ -48,11 +48,11 @@ export default async function HomePage() {
   });
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Global exposure</h1>
         <p className="text-xs" style={{ color: "var(--muted)" }}>
-          Peak country exposure across all current events · click to inspect
+          Click any country to inspect · toggle layers to add the maritime network
         </p>
       </div>
       <GlobalDashboard briefings={briefings} events={events} />

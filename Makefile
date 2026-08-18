@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup up down logs smoke test lint fmt engine-local clean data pipeline worker replay-suez replay-malformed dlq agent ui ui-build world context image parity
+.PHONY: help setup up down logs smoke test lint fmt engine-local clean data pipeline worker replay-suez replay-malformed dlq agent ui ui-build world context layers image parity
 
 help:  ## Show available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -70,6 +70,9 @@ ui-build:  ## Production build of the review UI
 
 context:  ## Refresh country context (World Bank WDI + CLDR currency)
 	uv run python scripts/fetch_country_context.py
+
+layers:  ## Fetch optional map layers (shipping lanes, ports, chokepoints)
+	uv run python scripts/fetch_map_layers.py
 
 world:  ## Rebuild the map's world geometry from Natural Earth
 	uv run python scripts/build_world_geojson.py
