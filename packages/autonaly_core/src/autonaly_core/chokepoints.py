@@ -125,6 +125,53 @@ CHOKEPOINTS: tuple[Chokepoint, ...] = (
         ),
     ),
     Chokepoint(
+        key="malacca",
+        lat=2.5,
+        lon=101.3,
+        portwatch_name="Malacca Strait",
+        label="Strait of Malacca",
+        source_countries=(*_GULF, "OMN", "AUS", "IDN", "MYS", "SGP", "IND", "BRA", "ZAF"),
+        baskets=("crude_oil", "lng", "lpg", "refined_products", "coal", "iron_ore"),
+        reroute=Reroute.LONGER_ROUTE,
+        importer_filter=("CHN", "JPN", "KOR", "TWN", "PHL", "VNM", "THA", "SGP", "MYS", "IDN"),
+        note=(
+            "The Gulf-to-East-Asia energy artery and the busiest of the Asian "
+            "straits. Lombok and Sunda are the alternatives — navigable, but "
+            "longer and shallower, so a closure is a cost shock rather than a cutoff."
+        ),
+    ),
+    Chokepoint(
+        key="bosporus",
+        lat=41.1,
+        lon=29.1,
+        portwatch_name="Bosporus Strait",
+        label="Bosporus Strait",
+        source_countries=("RUS", "UKR", "ROU", "BGR", "GEO"),
+        baskets=("wheat", "maize", "barley", "crude_oil", "refined_products", "nitrogen_fertilizer"),
+        reroute=Reroute.NONE,
+        importer_filter=None,
+        note=(
+            "The Black Sea's only maritime exit. Ukrainian and Russian grain and "
+            "Black Sea crude have no seaborne alternative, which is why closures "
+            "here transmit straight into food and energy prices."
+        ),
+    ),
+    Chokepoint(
+        key="gibraltar",
+        lat=35.97,
+        lon=-5.5,
+        portwatch_name="Gibraltar Strait",
+        label="Strait of Gibraltar",
+        source_countries=("USA", "BRA", "CAN", "NGA", "DZA", "MAR", "NOR", "GBR"),
+        baskets=("crude_oil", "refined_products", "lng", "wheat", "maize", "soybeans"),
+        reroute=Reroute.NONE,
+        importer_filter=_EUROPE_MED,
+        note=(
+            "The Mediterranean's Atlantic door. Cargo entering the basin from the "
+            "west has no other way in — Suez serves the eastern approach, not this one."
+        ),
+    ),
+    Chokepoint(
         key="bab_el_mandeb",
         lat=12.79,
         lon=43.35,

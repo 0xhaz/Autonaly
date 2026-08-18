@@ -194,9 +194,11 @@ export default function GlobalMap({
             source: "lanes",
             layout: { visibility: "none", "line-cap": "round" },
             paint: {
-              "line-color": "#5b8fc9",
-              "line-width": 0.7,
-              "line-opacity": 0.5,
+              // Lanes have to read over both ocean and land, and at 0.5 opacity
+              // over dark water they effectively vanished.
+              "line-color": "#a8c8ea",
+              "line-width": 0.8,
+              "line-opacity": 0.75,
               // Dotted, because these are indicative lanes rather than surveyed
               // routes — a solid line would claim more precision than the data has.
               "line-dasharray": [2, 2.5],

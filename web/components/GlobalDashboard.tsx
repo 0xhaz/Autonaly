@@ -25,7 +25,7 @@ const LAYER_META: { key: keyof LayerToggles; label: string; hint: string; swatch
     key: "lanes",
     label: "Shipping lanes",
     hint: "Indicative maritime routes",
-    swatch: "#5b8fc9",
+    swatch: "#a8c8ea",
   },
   {
     key: "ports",

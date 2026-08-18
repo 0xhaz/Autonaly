@@ -28,9 +28,13 @@ ROUTES = f"{ROOT}/Global_Shipping_Routes/FeatureServer/15/query"
 PORTS = f"{ROOT}/PortWatch_ports_database/FeatureServer/0/query"
 CHOKEPOINTS = f"{ROOT}/PortWatch_chokepoints_database/FeatureServer/0/query"
 
-# 2,065 ports is noise at world zoom and a slow layer. The busiest few hundred
-# carry the story and stay legible.
+# Two different jobs, two different cuts. At world zoom 2,065 dots is noise, so
+# the map layer takes the busiest few hundred. The country drawer has the
+# opposite problem — a reader clicking Oman wants Oman's ports, and a global
+# top-300 leaves most countries empty — so it gets a much deeper list grouped by
+# country.
 PORT_LIMIT = 300
+PORT_DIRECTORY_LIMIT = 1400
 
 
 def get(url: str, params: dict) -> dict:
@@ -61,18 +65,23 @@ def shipping_lanes() -> dict:
     }
 
 
-def ports() -> dict:
+def fetch_ports(limit: int) -> list[dict]:
     payload = get(
         PORTS,
         {
             "where": "1=1",
             "outFields": "portname,country,ISO3,lat,lon,vessel_count_total,industry_top1",
             "orderByFields": "vessel_count_total DESC",
-            "resultRecordCount": str(PORT_LIMIT),
+            "resultRecordCount": str(limit),
             "returnGeometry": "false",
             "f": "json",
         },
     )
+    return [r["attributes"] for r in payload.get("features", [])]
+
+
+def ports() -> dict:
+    payload = {"features": [{"attributes": a} for a in fetch_ports(PORT_LIMIT)]}
     features = []
     for row in payload.get("features", []):
         a = row["attributes"]
@@ -129,6 +138,25 @@ def chokepoints() -> dict:
     return {"type": "FeatureCollection", "features": features}
 
 
+def port_directory() -> dict:
+    """Ports grouped by country, for the drawer."""
+    grouped: dict[str, list[dict]] = {}
+    for a in fetch_ports(PORT_DIRECTORY_LIMIT):
+        iso3 = (a.get("ISO3") or "").strip()
+        if not iso3:
+            continue
+        grouped.setdefault(iso3, []).append(
+            {
+                "name": a.get("portname"),
+                "vessels": a.get("vessel_count_total") or 0,
+                "industry": a.get("industry_top1"),
+            }
+        )
+    for rows in grouped.values():
+        rows.sort(key=lambda r: r["vessels"], reverse=True)
+    return grouped
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     print("\n  Map layers — IMF PortWatch\n")
@@ -147,6 +175,15 @@ def main() -> int:
             else len(data["features"])
         )
         print(f"  {name:16s} {count:5d} features   {path.stat().st_size / 1024:7.0f} KB")
+
+    directory = port_directory()
+    path = OUT / "ports-by-country.json"
+    path.write_text(json.dumps(directory, separators=(",", ":")), encoding="utf-8")
+    total = sum(len(v) for v in directory.values())
+    print(
+        f"  {'ports-by-country':16s} {total:5d} ports across {len(directory)} countries"
+        f"   {path.stat().st_size / 1024:7.0f} KB"
+    )
 
     print("\n  Data: UN Global Platform; IMF PortWatch\n")
     return 0

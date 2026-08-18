@@ -58,8 +58,23 @@ interface Economy {
   top_import_baskets: BasketRow[];
 }
 
+interface Port {
+  name: string;
+  vessels: number;
+  industry?: string | null;
+}
+
+interface Transit {
+  key: string;
+  label: string;
+  role: string;
+  reroute: string;
+  bypass: boolean;
+}
+
 interface Profile {
   country: string;
+  chokepoints: Transit[];
   context: Context | null;
   economy: Economy;
   basket_labels: string[];
@@ -149,6 +164,7 @@ export default function CountryDrawer({
 }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [portsByCountry, setPortsByCountry] = useState<Record<string, Port[]> | null>(null);
   const [tab, setTab] = useState<"overview" | "analysis">("overview");
 
   const loading = country !== null && profile?.country !== country && error === null;
@@ -177,6 +193,20 @@ export default function CountryDrawer({
   }, [country, baskets, sources]);
 
   useEffect(() => {
+    // Fetched once and reused for every country the reader opens.
+    let cancelled = false;
+    fetch("/layers/ports-by-country.json")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setPortsByCountry(d);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -185,6 +215,8 @@ export default function CountryDrawer({
   const open = country !== null;
   const ctx = profile?.context;
   const eco = profile?.economy;
+  const ports = (country && portsByCountry?.[country]) || [];
+  const transits = profile?.chokepoints ?? [];
 
   return (
     <>
@@ -292,8 +324,58 @@ export default function CountryDrawer({
               </Group>
             )}
 
+            {ports.length > 0 && (
+              <Group
+                title="Ports"
+                note={`${ports.length} in the PortWatch database · vessel calls per year`}
+              >
+                {ports.slice(0, 6).map((port) => (
+                  <div key={port.name} className="flex items-baseline justify-between gap-2 py-[3px]">
+                    <span className="truncate text-xs" title={port.name}>
+                      {port.name}
+                    </span>
+                    <span className="mono shrink-0 text-xs" style={{ color: "var(--muted)" }}>
+                      {port.vessels.toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </Group>
+            )}
+
+            {transits.length === 0 && ports.length > 0 && (
+              <p className="text-[11px]" style={{ color: "var(--muted)" }}>
+                No modelled chokepoint sits on this country&apos;s routes. Six are
+                modelled so far; all 28 are on the map under Chokepoints.
+              </p>
+            )}
+
+            {transits.length > 0 && (
+              <Group
+                title="Chokepoints on its routes"
+                note="Whether cargo can divert decides if a closure is a delay or a cutoff."
+              >
+                {transits.map((t) => (
+                  <div key={t.key} className="py-[3px]">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-xs font-medium">{t.label}</span>
+                      <span
+                        className="mono shrink-0 text-[10px] uppercase tracking-wider"
+                        style={{ color: t.bypass ? "var(--muted)" : "#e8a33d" }}
+                      >
+                        {t.bypass ? "bypass exists" : "no bypass"}
+                      </span>
+                    </div>
+                    <div className="text-[11px]" style={{ color: "var(--muted)" }}>
+                      {t.role}
+                    </div>
+                  </div>
+                ))}
+              </Group>
+            )}
+
             <p className="text-[11px]" style={{ color: "var(--muted)" }}>
-              Context: World Bank WDI {ctx?.gdp_usd ? "2024" : ""} · Trade: BACI/CEPII 2024
+              Context: World Bank WDI 2024 · Trade: BACI/CEPII 2024 · Ports and
+              chokepoints: IMF PortWatch
             </p>
           </div>
         )}

@@ -310,6 +310,29 @@ def country_profile(
 
     context = country_context(paths.context).get(iso3, {})
 
+    # Which modelled chokepoints this country's trade actually runs through, and
+    # in which direction. This is the "why does this country matter to world
+    # trade" answer that a ranking alone never gives.
+    from autonaly_core.chokepoints import CHOKEPOINTS
+
+    transits = []
+    for cp in CHOKEPOINTS:
+        as_origin = iso3 in cp.source_countries
+        as_destination = bool(cp.importer_filter and iso3 in cp.importer_filter)
+        if not (as_origin or as_destination):
+            continue
+        transits.append(
+            {
+                "key": cp.key,
+                "label": cp.label,
+                "role": "origin and destination"
+                if as_origin and as_destination
+                else ("exports transit" if as_origin else "imports arrive via"),
+                "reroute": cp.reroute.value,
+                "bypass": cp.reroute.value != "none",
+            }
+        )
+
     economy = country_economy(
         con, paths, iso3, {b.key: b.codes for b in BY_KEY.values() if not b.parent}
     )
@@ -323,6 +346,7 @@ def country_profile(
         "country": iso3,
         "context": context or None,
         "economy": economy,
+        "chokepoints": transits,
         "baskets": keys,
         "basket_labels": [BY_KEY[k].label for k in keys],
         "total_imports_kusd": round(total_imports, 1),
