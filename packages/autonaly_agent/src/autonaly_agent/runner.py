@@ -18,6 +18,9 @@ log = logging.getLogger(__name__)
 class AgentRun:
     signal_key: str
     tool_calls: list[str] = field(default_factory=list)
+    agents: list[str] = field(default_factory=list)
+    """Every agent that produced events, in order — the routing audit trail."""
+
     final_text: str = ""
 
     @property
@@ -36,9 +39,19 @@ class AgentRun:
                 return route
         return None
 
+    @property
+    def specialist(self) -> str | None:
+        """The specialist the coordinator handed the event to, if any."""
+        for name in self.agents:
+            if name != "crisis_desk":
+                return name
+        return None
+
     def summary(self) -> str:
         return (
-            f"signal={self.signal_key} route={self.route or 'none (out of scope)'} "
+            f"signal={self.signal_key} "
+            f"specialist={self.specialist or 'none (handled by coordinator)'} "
+            f"route={self.route or 'none (out of scope)'} "
             f"tools={len(self.tool_calls)} filed={self.filed}"
         )
 
@@ -80,6 +93,9 @@ async def run_on_signal(signal: Signal, session_id: str | None = None) -> AgentR
         session_id=session_id or f"signal-{key}",
         new_message=message,
     ):
+        author = getattr(event, "author", None)
+        if author and (not result.agents or result.agents[-1] != author):
+            result.agents.append(author)
         for part in (event.content.parts if event.content else []) or []:
             if getattr(part, "function_call", None):
                 result.tool_calls.append(part.function_call.name)

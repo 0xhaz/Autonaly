@@ -31,6 +31,13 @@ SIGNALS = {
         "Beijing will require export licences for neodymium-iron-boron permanent "
         "magnets and related processed rare-earth products, effective immediately.",
     ),
+    "black-sea": (
+        "Bosporus transit halted as Black Sea tensions escalate",
+        "Commercial transits through the Bosporus Strait have been suspended amid "
+        "escalating naval tensions, cutting off Black Sea grain and fertilizer "
+        "exports. Ukrainian and Russian wheat shipments are held at anchor. "
+        "Window began 2026-08-10 and is ongoing.",
+    ),
     "financial": (
         "Regional bank collapse triggers credit crunch across eurozone",
         "Two mid-sized lenders failed after a run on deposits; interbank lending "

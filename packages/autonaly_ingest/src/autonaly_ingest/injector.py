@@ -60,6 +60,17 @@ REPLAYS: dict[str, Signal] = {
         source="replay:hormuz-watchlist",
         observed_at=datetime(2026, 7, 31, 12, 0, tzinfo=UTC),
     ),
+    "black-sea": Signal(
+        headline="Bosporus transit halted as Black Sea tensions escalate",
+        body=(
+            "Commercial transits through the Bosporus Strait have been suspended "
+            "amid escalating naval tensions, cutting off Black Sea grain and "
+            "fertilizer exports. Ukrainian and Russian wheat shipments are held "
+            "at anchor. Window began 2026-08-10 and is ongoing."
+        ),
+        source="replay:black-sea-grain",
+        observed_at=datetime(2026, 8, 10, 6, 0, tzinfo=UTC),
+    ),
     "financial": Signal(
         headline="Regional bank collapse triggers credit crunch across eurozone",
         body=(

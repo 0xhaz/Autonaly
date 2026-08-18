@@ -146,17 +146,22 @@ CHOKEPOINTS: tuple[Chokepoint, ...] = (
         lon=29.1,
         portwatch_name="Bosporus Strait",
         label="Bosporus Strait",
-        source_countries=("RUS", "UKR", "ROU", "BGR", "GEO"),
-        baskets=(
-            "wheat", "maize", "barley", "crude_oil", "refined_products",
-            "nitrogen_fertilizer",
-        ),
+        # Deliberately grain-only, and deliberately RUS+UKR only. The first cut
+        # included Russian crude and EU coastal states, and the result was
+        # confidently wrong: it scored ALL Chinese imports of Russian crude as
+        # Bosporus-exposed ($72bn "at risk") when most of that oil ships from the
+        # Pacific and never sees the Black Sea. A chokepoint may only claim
+        # baskets whose flows from its sources predominantly transit it —
+        # Ukrainian grain entirely, Russian wheat predominantly (Novorossiysk).
+        # Romania and Bulgaria have EU land routes, so they are out too.
+        source_countries=("RUS", "UKR"),
+        baskets=("wheat", "maize", "barley"),
         reroute=Reroute.NONE,
         importer_filter=None,
         note=(
-            "The Black Sea's only maritime exit. Ukrainian and Russian grain and "
-            "Black Sea crude have no seaborne alternative, which is why closures "
-            "here transmit straight into food and energy prices."
+            "The Black Sea's only maritime exit. Russian and Ukrainian grain has "
+            "no seaborne alternative, which is why closures here transmit "
+            "straight into food prices."
         ),
     ),
     Chokepoint(

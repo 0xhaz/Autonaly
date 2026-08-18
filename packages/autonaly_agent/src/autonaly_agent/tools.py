@@ -335,8 +335,13 @@ Choose the ones that carry the argument.
 
 Write these sections, and nothing else:
 
-**What happened** — two or three sentences. The event, the measured disruption,
+**What happened** — two or three sentences. The event, the MEASURED disruption,
 and whether this is a supply cutoff or a cost-and-delay shock. Say which.
+If an `observation` is present in DATA, its transit figures are the ground truth:
+report the measured reduction, and when the signal's own language claims more
+("halted", "blocked") than the ships show, spend one sentence on that gap —
+e.g. "reported as a halt, though observed transits fell 17% against baseline".
+Never adopt the signal's severity wording unless the measurement supports it.
 
 **What it means** — the interpretation a reader cannot get from the table.
 Magnitude and intensity disagree here: {largest} carries the most trade value at
