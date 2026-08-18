@@ -88,6 +88,13 @@ def handle(data: bytes, attributes: dict[str, str], ledger: SignalLedger) -> dic
     result = asyncio.run(run_on_signal(signal))
     ledger.record(signal, result.route, result.filed)
 
+    if result.filed and result.filed_id:
+        # The briefing is filed and the gate is unaffected; the fan-out is
+        # best-effort by design.
+        from .notify import notify_analysts
+
+        notify_analysts(result.filed_id)
+
     log.info("processed %s", result.summary())
     return {
         "signal_key": key,

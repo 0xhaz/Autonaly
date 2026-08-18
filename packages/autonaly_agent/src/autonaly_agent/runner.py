@@ -21,6 +21,10 @@ class AgentRun:
     agents: list[str] = field(default_factory=list)
     """Every agent that produced events, in order — the routing audit trail."""
 
+    filed_id: str | None = None
+    """The briefing record id, captured from submit_for_review's response — the
+    hook downstream fan-out (proactive analyst notes) keys on."""
+
     final_text: str = ""
 
     @property
@@ -99,6 +103,17 @@ async def run_on_signal(signal: Signal, session_id: str | None = None) -> AgentR
         for part in (event.content.parts if event.content else []) or []:
             if getattr(part, "function_call", None):
                 result.tool_calls.append(part.function_call.name)
+            elif getattr(part, "function_response", None):
+                fr = part.function_response
+                if fr.name == "submit_for_review":
+                    response = fr.response or {}
+                    if not isinstance(response, dict):
+                        response = {}
+                    result.filed_id = (
+                        response.get("record_id")
+                        or (response.get("result") or {}).get("record_id")
+                        or result.filed_id
+                    )
             elif getattr(part, "text", None):
                 result.final_text = part.text
 

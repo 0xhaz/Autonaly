@@ -16,10 +16,21 @@ export async function GET() {
         label: b.label,
         essentiality: b.essentiality,
       })),
-      chokepoints: chokepoints.chokepoints.map((c: { key: string; label: string }) => ({
-        key: c.key,
-        label: c.label,
-      })),
+      chokepoints: chokepoints.chokepoints.map(
+        (c: {
+          key: string;
+          label: string;
+          reroute: string;
+          attenuation: number;
+          note: string;
+        }) => ({
+          key: c.key,
+          label: c.label,
+          reroute: c.reroute,
+          attenuation: c.attenuation,
+          note: c.note,
+        }),
+      ),
     });
   } catch {
     return NextResponse.json({ error: "engine unavailable" }, { status: 503 });

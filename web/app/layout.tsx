@@ -50,6 +50,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </span>
             </Link>
             <div className="flex items-center gap-4">
+              <Link href="/simulate" className="text-xs" style={{ color: "var(--muted)" }}>
+                Simulator
+              </Link>
               <p className="hidden text-xs lg:block" style={{ color: "var(--muted)" }}>
                 Gemini reasons · the engine computes · a human approves
               </p>
