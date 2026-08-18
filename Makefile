@@ -42,6 +42,9 @@ lint:  ## Ruff check
 fmt:  ## Ruff format + import sort
 	uv run ruff format . && uv run ruff check --fix .
 
+agent-api:  ## Run the agent HTTP surface (personalization) on :8090
+	uv run uvicorn autonaly_agent.api:app --reload --port 8090
+
 engine-local:  ## Run the exposure engine on :8080
 	uv run uvicorn autonaly_engine.main:app --reload --port 8080
 

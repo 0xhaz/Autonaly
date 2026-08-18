@@ -44,3 +44,6 @@ pubsub-debug.log
 
 # os
 .DS_Store
+
+# clerk CLI link state
+.clerk/

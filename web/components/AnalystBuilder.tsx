@@ -1,0 +1,236 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+/**
+ * Build-your-analyst onboarding.
+ *
+ * The user is not configuring software; they are hiring a specialist. So the
+ * form reads as a brief: name the analyst, hand it a watchlist of commodities,
+ * countries and chokepoints. Everything offered comes from the engine's own
+ * catalogues — the user cannot ask for a basket the desk cannot score.
+ */
+
+interface Meta {
+  baskets: { key: string; label: string; essentiality: string }[];
+  chokepoints: { key: string; label: string }[];
+}
+
+interface Props {
+  initial?: {
+    analyst_name: string;
+    baskets: string[];
+    countries: string[];
+    chokepoints: string[];
+  } | null;
+  onSaved: () => void;
+}
+
+const TEMPLATES = [
+  {
+    name: "Energy Desk",
+    baskets: ["crude_oil", "refined_products", "lng", "lpg"],
+    chokepoints: ["hormuz", "suez", "malacca"],
+    countries: ["JPN", "KOR", "IND", "CHN"],
+  },
+  {
+    name: "Food Security Desk",
+    baskets: ["wheat", "maize", "rice", "nitrogen_fertilizer", "potash"],
+    chokepoints: ["bosporus", "suez"],
+    countries: ["EGY", "TUR", "KEN", "PAK"],
+  },
+  {
+    name: "Tech Supply Desk",
+    baskets: ["semiconductors", "rare_earth_magnets", "lithium", "cobalt"],
+    chokepoints: ["malacca"],
+    countries: ["TWN", "VNM", "KOR", "DEU"],
+  },
+];
+
+export default function AnalystBuilder({ initial, onSaved }: Props) {
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [countries, setCountries] = useState<{ iso3: string; name: string }[]>([]);
+  const [name, setName] = useState(initial?.analyst_name ?? "");
+  const [baskets, setBaskets] = useState<Set<string>>(new Set(initial?.baskets ?? []));
+  const [watched, setWatched] = useState<Set<string>>(new Set(initial?.countries ?? []));
+  const [chokes, setChokes] = useState<Set<string>>(new Set(initial?.chokepoints ?? []));
+  const [countryQuery, setCountryQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/meta").then((r) => r.json()).then(setMeta).catch(() => {});
+    fetch("/world.geo.json")
+      .then((r) => r.json())
+      .then((w) =>
+        setCountries(
+          w.features
+            .map((f: { properties: { iso3: string; name: string } }) => f.properties)
+            .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)),
+        ),
+      )
+      .catch(() => {});
+  }, []);
+
+  const matches = useMemo(() => {
+    if (!countryQuery) return [];
+    const q = countryQuery.toLowerCase();
+    return countries
+      .filter(
+        (c) =>
+          !watched.has(c.iso3) &&
+          (c.name.toLowerCase().includes(q) || c.iso3.toLowerCase().includes(q)),
+      )
+      .slice(0, 6);
+  }, [countryQuery, countries, watched]);
+
+  const toggle = (set: Set<string>, setter: (s: Set<string>) => void, key: string) => {
+    const next = new Set(set);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setter(next);
+  };
+
+  const applyTemplate = (t: (typeof TEMPLATES)[number]) => {
+    setName((n) => n || t.name);
+    setBaskets(new Set(t.baskets));
+    setChokes(new Set(t.chokepoints));
+    setWatched(new Set(t.countries));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    const response = await fetch("/api/profile", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        analyst_name: name || "My analyst",
+        baskets: [...baskets],
+        countries: [...watched],
+        chokepoints: [...chokes],
+      }),
+    });
+    setSaving(false);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      setError(body.error ?? "could not save");
+      return;
+    }
+    onSaved();
+  };
+
+  const chip = (active: boolean) => ({
+    border: `1px solid ${active ? "var(--accent)" : "var(--line)"}`,
+    background: active ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
+    color: active ? "var(--text)" : "var(--muted)",
+  });
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <header>
+        <h1 className="text-xl font-semibold">Build your risk analyst</h1>
+        <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+          Pick what it watches. When the desk files an event briefing, your analyst
+          reads it against this watchlist and writes what it means for you.
+        </p>
+      </header>
+
+      <section className="panel space-y-1 p-4">
+        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          Start from a desk
+        </label>
+        <div className="flex flex-wrap gap-2 pt-1">
+          {TEMPLATES.map((t) => (
+            <button key={t.name} type="button" onClick={() => applyTemplate(t)}
+              className="rounded-md px-3 py-1.5 text-xs font-medium"
+              style={{ border: "1px solid var(--line)", color: "var(--text)" }}>
+              {t.name}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel space-y-2 p-4">
+        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          Name your analyst
+        </label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Gulf Energy Watch"
+          className="w-full rounded-md px-3 py-2 text-sm"
+          style={{ background: "var(--panel-2)", border: "1px solid var(--line)", color: "var(--text)" }}
+        />
+      </section>
+
+      <section className="panel space-y-2 p-4">
+        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          Commodities · {baskets.size} watched
+        </label>
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {(meta?.baskets ?? []).map((b) => (
+            <button key={b.key} type="button" onClick={() => toggle(baskets, setBaskets, b.key)}
+              className="rounded-full px-2.5 py-1 text-xs" style={chip(baskets.has(b.key))}>
+              {b.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel space-y-2 p-4">
+        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          Countries · {watched.size} watched
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {[...watched].map((iso3) => (
+            <button key={iso3} type="button" onClick={() => toggle(watched, setWatched, iso3)}
+              className="mono rounded-full px-2.5 py-1 text-xs" style={chip(true)}>
+              {iso3} ✕
+            </button>
+          ))}
+        </div>
+        <input
+          value={countryQuery}
+          onChange={(e) => setCountryQuery(e.target.value)}
+          placeholder="Search countries…"
+          className="w-full rounded-md px-3 py-2 text-sm"
+          style={{ background: "var(--panel-2)", border: "1px solid var(--line)", color: "var(--text)" }}
+        />
+        {matches.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {matches.map((c) => (
+              <button key={c.iso3} type="button"
+                onClick={() => { toggle(watched, setWatched, c.iso3); setCountryQuery(""); }}
+                className="rounded-full px-2.5 py-1 text-xs" style={chip(false)}>
+                {c.name} <span className="mono">{c.iso3}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="panel space-y-2 p-4">
+        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          Chokepoints · {chokes.size} watched
+        </label>
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {(meta?.chokepoints ?? []).map((c) => (
+            <button key={c.key} type="button" onClick={() => toggle(chokes, setChokes, c.key)}
+              className="rounded-full px-2.5 py-1 text-xs" style={chip(chokes.has(c.key))}>
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {error && <p className="text-sm" style={{ color: "var(--danger)" }}>{error}</p>}
+
+      <button type="button" onClick={save} disabled={saving}
+        className="rounded-md px-5 py-2.5 text-sm font-semibold"
+        style={{ background: "var(--accent)", color: "#04121f", opacity: saving ? 0.6 : 1 }}>
+        {saving ? "Saving…" : initial ? "Update analyst" : "Hire this analyst"}
+      </button>
+    </div>
+  );
+}
