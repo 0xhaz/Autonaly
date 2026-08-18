@@ -19,17 +19,14 @@ type MapLibre = any;
 
 const MAPLIBRE_URL = "/vendor/maplibre/maplibre-gl.mjs";
 
-// Single-hue sequential blue, dark->light for a dark surface.
-const RAMP_COLORS = ["#104281", "#184f95", "#256abf", "#3987e5", "#6da7ec", "#9ec5f4"];
-const MIN_DOMAIN = 5;
-
-function rampStops(maxScore: number): (number | string)[] {
-  const domain = Math.max(MIN_DOMAIN, maxScore);
-  return RAMP_COLORS.flatMap((color, i) => [
-    (domain * i) / (RAMP_COLORS.length - 1),
-    color,
-  ]);
-}
+// The landing map is an explorer, not a heatmap. Countries rest in the surface
+// neutral so nothing competes for attention; the cursor is what lights a country
+// up, and a committed selection holds a deeper blue. Exposure still travels with
+// the country — it is in the hover tooltip and in the drawer — it just no longer
+// paints twenty fills at once.
+const NEUTRAL = "#151d28";
+const HOVER = "#3987e5";
+const SELECTED = "#1c5cab";
 
 export interface MapEvent {
   id: string;
@@ -63,6 +60,7 @@ export default function GlobalMap({
   const [world, setWorld] = useState<{ features: WorldFeature[] } | null>(null);
 
   const onSelectRef = useRef(onSelect);
+  const prevSelected = useRef<string | null>(null);
   useEffect(() => {
     onSelectRef.current = onSelect;
   }, [onSelect]);
@@ -89,8 +87,6 @@ export default function GlobalMap({
         /* webpackIgnore: true */ /* turbopackIgnore: true */ MAPLIBRE_URL
       );
       if (disposed || !container.current || map.current) return;
-
-      const maxScore = Math.max(0, ...Object.values(scores));
 
       const scored = {
         type: "FeatureCollection" as const,
@@ -132,18 +128,13 @@ export default function GlobalMap({
             paint: {
               "fill-color": [
                 "case",
-                ["==", ["get", "scored"], 0],
-                "#131a24",
-                ["interpolate", ["linear"], ["get", "score"], ...rampStops(maxScore)],
-              ],
-              // The choropleth is a base layer, not the focus. Hovering brings a
-              // country forward rather than leaving every fill shouting at once.
-              "fill-opacity": [
-                "case",
+                ["boolean", ["feature-state", "selected"], false],
+                SELECTED,
                 ["boolean", ["feature-state", "hover"], false],
-                1,
-                0.55,
+                HOVER,
+                NEUTRAL,
               ],
+              "fill-opacity": 1,
             },
           },
           {
@@ -155,7 +146,7 @@ export default function GlobalMap({
               "line-width": [
                 "case",
                 ["boolean", ["feature-state", "hover"], false],
-                1.6,
+                1.4,
                 0,
               ],
             },
@@ -165,13 +156,6 @@ export default function GlobalMap({
             type: "line",
             source: "world",
             paint: { "line-color": "#2a3a47", "line-width": 0.4 },
-          },
-          {
-            id: "selection",
-            type: "line",
-            source: "world",
-            filter: ["==", ["get", "iso3"], selected ?? "__none__"],
-            paint: { "line-color": "#e8a33d", "line-width": 2 },
           },
           // Halo then core, so a marker reads against any shading beneath it.
           {
@@ -288,19 +272,31 @@ export default function GlobalMap({
   useEffect(() => {
     const m = map.current;
     if (!m) return;
+
     const apply = () => {
-      if (!map.current?.getLayer?.("selection")) return;
+      const map_ = map.current;
+      if (!map_?.getSource?.("world")) return;
       try {
-        map.current.setFilter("selection", ["==", ["get", "iso3"], selected ?? "__none__"]);
+        if (prevSelected.current) {
+          map_.setFeatureState(
+            { source: "world", id: prevSelected.current },
+            { selected: false },
+          );
+        }
+        prevSelected.current = selected ?? null;
+        if (selected) {
+          map_.setFeatureState({ source: "world", id: selected }, { selected: true });
+        }
       } catch {
-        // Decoration only — never surface as a page error.
+        // Selection colour is presentation. Losing it must never surface as a
+        // page error — the drawer already names the selected country.
       }
     };
+
     if (m.isStyleLoaded()) apply();
     else m.once("idle", apply);
   }, [selected, world]);
 
-  const domainMax = Math.max(MIN_DOMAIN, ...Object.values(scores));
 
   return (
     <div className="space-y-2">
@@ -310,17 +306,22 @@ export default function GlobalMap({
         style={{ border: "1px solid var(--line)" }}
       />
       <div
-        className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]"
+        className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]"
         style={{ color: "var(--muted)" }}
       >
-        <span className="flex items-center gap-2">
-          <span>peak exposure</span>
-          <span className="mono">0</span>
+        <span className="flex items-center gap-1.5">
           <span
-            className="h-2 w-32 rounded-sm"
-            style={{ background: `linear-gradient(to right, ${RAMP_COLORS.join(",")})` }}
+            className="inline-block h-2.5 w-2.5 rounded-sm"
+            style={{ background: HOVER }}
           />
-          <span className="mono">{domainMax.toFixed(1)}</span>
+          hover
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-sm"
+            style={{ background: SELECTED }}
+          />
+          selected
         </span>
         <span style={{ color: "#d03b3b" }}>● scored event</span>
         <span style={{ color: "#fab219" }}>● unscored — data quality</span>
