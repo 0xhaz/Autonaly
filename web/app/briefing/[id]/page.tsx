@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { approve, reject } from "@/app/actions";
 import BriefingWorkspace from "@/components/BriefingWorkspace";
+import CiteLine from "@/components/CiteLine";
 import { getBriefing } from "@/lib/firestore";
 import { formatPercent } from "@/lib/types";
 
@@ -49,6 +50,14 @@ export default async function BriefingPage({
   if (!briefing) notFound();
 
   const rankings = briefing.rankings;
+
+  // The composer ends with a single quotable claim. Split it out so it can be
+  // presented as a citation rather than buried as the last line of prose.
+  const citeMatch = briefing.narrative.match(/^CITE:\s*(.+)$/m);
+  const claim = citeMatch?.[1]?.trim() ?? null;
+  const body = citeMatch
+    ? briefing.narrative.replace(citeMatch[0], "").trimEnd()
+    : briefing.narrative;
   const isPending = briefing.status === "pending";
 
   return (
@@ -126,6 +135,10 @@ export default async function BriefingPage({
 
       {rankings && rankings.affected.length > 0 && (
         <BriefingWorkspace rankings={rankings} sources={rankings.sources ?? []} />
+      )}
+
+      {claim && (
+        <CiteLine claim={claim} vintage="BACI 2024" />
       )}
 
       <section className="panel p-6">

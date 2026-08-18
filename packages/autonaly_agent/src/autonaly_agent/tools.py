@@ -313,28 +313,47 @@ def compute_chokepoint_exposure(
 # --------------------------------------------------------------------------
 
 
-COMPOSE_PROMPT = """Write a supply-chain crisis briefing for an analyst audience.
+COMPOSE_PROMPT = """Write the analyst judgement that accompanies a computed
+exposure table. The table is already on the page. Your job is what the table
+cannot say.
 
 ABSOLUTE RULE: every number you write must appear in the DATA below. Do not
-compute, round differently, estimate, annualise, or infer any figure. If you want
-to state something the data does not contain, describe it qualitatively instead.
+compute, round differently, estimate, annualise, or infer any figure.
 
-Lead with magnitude, then intensity. The country with the largest absolute
-exposure is named in the data as largest_absolute_exposure — that is the headline.
-The ranking is ordered by dependency *intensity*, which favours smaller, more
-concentrated importers; do not present the top of that list as though it were the
-biggest story.
+DO NOT re-list the ranking. The reader can see it. A narrative that restates
+rows is strictly worse than the table it duplicates.
+
+NEVER write a field name. `ddr`, `hhi`, `value_at_risk_kusd`, `score` and the
+like are storage details. Write "51% of its imports in this basket" — never
+"ddr: 0.5101". A briefing that reads like a JSON dump cannot be quoted by
+anyone, which defeats its purpose.
+
+Use at most FOUR figures in the whole briefing, in human units ($7.62bn, 51%).
+Choose the ones that carry the argument.
 
 {severity_guidance}
 
-Structure:
-- One-paragraph summary: what happened and who it matters to most.
-- Exposure: the largest absolute exposure, then the most intensely dependent.
-- Beneficiaries, if any are listed.
-- Limitations: state that figures use latest-year trade weights and first-order
-  effects only.
+Write these sections, and nothing else:
 
-Be direct. No hedging filler, no invented causes, no forecasts or advice.
+**What happened** — two or three sentences. The event, the measured disruption,
+and whether this is a supply cutoff or a cost-and-delay shock. Say which.
+
+**What it means** — the interpretation a reader cannot get from the table.
+Magnitude and intensity disagree here: {largest} carries the most trade value at
+risk, while the ranking is topped by smaller, more concentrated importers.
+Explain why both readings are true and which one a decision should lean on.
+Name at most two countries.
+
+**What would change this** — the honest limits. Latest-year trade weights,
+first-order effects only, and any specific reason this particular estimate could
+be wrong.
+
+Then a final line, exactly in this form and nothing after it:
+
+CITE: <one sentence a journalist could quote verbatim, containing one figure and
+naming the source period>
+
+Be direct. No hedging filler, no invented causes, no forecasts, no advice.
 
 EVENT
 {event_summary}
@@ -475,9 +494,11 @@ def compose_briefing(
     if not rankings:
         guidance += UNSCORED_GUIDANCE
 
+    largest = (rankings or {}).get("largest_absolute_exposure") or "the largest importer"
     prompt = COMPOSE_PROMPT.format(
         severity_guidance=guidance,
         event_summary=event_summary,
+        largest=largest,
         data=json.dumps(data, indent=2),
     )
 
