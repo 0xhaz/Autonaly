@@ -145,7 +145,7 @@ export default async function BriefingPage({
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
           Analyst briefing
         </h2>
-        <div className="narrative">{renderNarrative(briefing.narrative)}</div>
+        <div className="narrative">{renderNarrative(body)}</div>
       </section>
 
       {rankings && rankings.winners.length > 0 && (

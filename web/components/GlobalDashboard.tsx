@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import CountryPanel from "@/components/CountryPanel";
+import CountryDrawer from "@/components/CountryDrawer";
 import GlobalMap, { type MapEvent } from "@/components/GlobalMap";
-import { formatKusd, formatPercent, type Briefing } from "@/lib/types";
+import { formatKusd, type Briefing } from "@/lib/types";
 
 /**
  * The landing dashboard.
@@ -75,25 +75,24 @@ export default function GlobalDashboard({
 }) {
   // Peak exposure per country across every current event. A max, not a sum:
   // two unrelated crises scoring 30 each do not make a 60.
-  const { scores, byCountry, totalAtRisk, worstCountry } = useMemo(() => {
+  const { scores, totalAtRisk, worstCountry } = useMemo(() => {
     const scores: Record<string, number> = {};
-    const byCountry: Record<string, { event: Briefing; score: number; ddr: number | null }[]> = {};
     let totalAtRisk = 0;
 
     for (const b of briefings) {
       for (const a of b.rankings?.affected ?? []) {
-        const score = a.score ?? 0;
-        scores[a.country] = Math.max(scores[a.country] ?? 0, score);
-        (byCountry[a.country] ??= []).push({ event: b, score, ddr: a.ddr });
+        // Peak, not sum: two unrelated crises scoring 30 each are not a 60.
+        scores[a.country] = Math.max(scores[a.country] ?? 0, a.score ?? 0);
         totalAtRisk += a.value_at_risk_kusd ?? 0;
       }
     }
-    const worstCountry =
-      Object.entries(scores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-    return { scores, byCountry, totalAtRisk, worstCountry };
+    const worstCountry = Object.entries(scores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    return { scores, totalAtRisk, worstCountry };
   }, [briefings]);
 
-  const [selected, setSelected] = useState<string | null>(worstCountry);
+  // Starts closed: the map is the page, and the drawer is something the
+  // reader opens, not a panel that is always half-covering it.
+  const [selected, setSelected] = useState<string | null>(null);
 
   const pending = briefings.filter((b) => b.status === "pending");
   const unscored = briefings.filter((b) => b.scoring === "curated");
@@ -111,7 +110,14 @@ export default function GlobalDashboard({
     };
   }, [briefings]);
 
-  const selectedEvents = selected ? (byCountry[selected] ?? []) : [];
+  // The drawer's exposure block wants this country's row from whichever event
+  // ranks it worst — the same event the map colour is showing.
+  const exposureFor = (iso3: string) => {
+    return briefings
+      .flatMap((b) => b.rankings?.affected ?? [])
+      .filter((a) => a.country === iso3)
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+  };
 
   return (
     <div className="space-y-4">
@@ -139,81 +145,36 @@ export default function GlobalDashboard({
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <GlobalMap
-          scores={scores}
-          events={events}
-          selected={selected}
-          onSelect={setSelected}
-        />
+      <GlobalMap
+        scores={scores}
+        events={events}
+        selected={selected}
+        onSelect={setSelected}
+      />
 
-        <div className="space-y-3">
-          <section>
-            <h2
-              className="mb-2 text-[11px] font-semibold uppercase tracking-wider"
-              style={{ color: "var(--muted)" }}
-            >
-              Review queue · {pending.length} pending
-            </h2>
-            <div className="space-y-2">
-              {briefings.map((b) => (
-                <QueueCard key={b.id} briefing={b} />
-              ))}
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-        <CountryPanel
-          country={selected}
-          baskets={baskets}
-          sources={sources}
-          exposure={undefined}
-        />
-
-        <section className="panel p-4">
-          <h2 className="text-sm font-semibold">
-            {selected ? `Events affecting ${selected}` : "Select a country"}
+      <section>
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+            Review queue · {pending.length} pending
           </h2>
-          {selectedEvents.length === 0 ? (
-            <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
-              {selected
-                ? "No current event ranks this country. Its trade profile is still shown on the left — that is the point of a knowledge base."
-                : "Click a country on the map."}
-            </p>
-          ) : (
-            <table className="rank mt-2">
-              <thead>
-                <tr>
-                  <th>Event</th>
-                  <th>Score</th>
-                  <th>Dependency</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedEvents
-                  .sort((a, b) => b.score - a.score)
-                  .map(({ event, score, ddr }) => (
-                    <tr key={event.id}>
-                      <td>
-                        <Link href={`/briefing/${event.id}`} style={{ color: "var(--accent)" }}>
-                          {event.title}
-                        </Link>
-                      </td>
-                      <td className="mono">{score.toFixed(1)}</td>
-                      <td className="mono">{formatPercent(ddr)}</td>
-                      <td>
-                        <span className={`chip chip-${event.status}`}>{event.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      </div>
+          <span className="text-[11px]" style={{ color: "var(--muted)" }}>
+            nothing publishes without a human
+          </span>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+          {briefings.map((b) => (
+            <QueueCard key={b.id} briefing={b} />
+          ))}
+        </div>
+      </section>
+
+      <CountryDrawer
+        country={selected}
+        baskets={baskets}
+        sources={sources}
+        exposure={selected ? exposureFor(selected) : undefined}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }

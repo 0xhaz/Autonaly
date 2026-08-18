@@ -19,6 +19,7 @@ class ArtifactPaths:
     ddr: str
     hhi: str
     flows: str
+    context: str
 
     @staticmethod
     def build(settings: Settings, version: str, year: int) -> ArtifactPaths:
@@ -31,7 +32,32 @@ class ArtifactPaths:
             ddr=f"{base}/exposure/{version}/{year}/ddr.parquet",
             hhi=f"{base}/exposure/{version}/{year}/hhi.parquet",
             flows=f"{base}/baci/{version}/{year}/flows.parquet",
+            context=f"{base}/context/{version}/{year}/countries.json",
         )
+
+
+@functools.lru_cache(maxsize=1)
+def country_context(context_path: str) -> dict[str, dict]:
+    """World Bank context, loaded once per process and cached.
+
+    Small enough (218 countries) to hold in memory, and read through the same
+    artifact layout as everything else so cutover needs no special case.
+    """
+    import json
+    from pathlib import Path
+
+    if context_path.startswith("gs://"):
+        import duckdb as _duckdb
+
+        con = _duckdb.connect()
+        con.execute("INSTALL httpfs; LOAD httpfs;")
+        raw = con.execute(f"SELECT content FROM read_text('{context_path}')").fetchone()[0]
+        return json.loads(raw).get("countries", {})
+
+    path = Path(context_path)
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8")).get("countries", {})
 
 
 @functools.lru_cache(maxsize=1)
@@ -224,3 +250,55 @@ def importer_supplier_share(
         """
     ).fetchall()
     return {(imp, sup): share for imp, sup, share in rows}
+
+
+def country_economy(
+    con: duckdb.DuckDBPyConnection,
+    paths: ArtifactPaths,
+    country: str,
+    basket_codes: dict[str, tuple[str, ...]],
+) -> dict:
+    """What a country actually trades, across every basket rather than one event.
+
+    This is the professional lens: a ranking says a country is exposed, but the
+    question behind it is usually "how much does this matter to them" — which
+    needs total trade and the commodity groups that carry it.
+    """
+    totals = con.execute(
+        f"""
+        SELECT
+            COALESCE(SUM(CASE WHEN exporter = '{country}' THEN value_kusd END), 0),
+            COALESCE(SUM(CASE WHEN importer = '{country}' THEN value_kusd END), 0)
+        FROM '{paths.flows}'
+        """
+    ).fetchone()
+
+    exports_total, imports_total = float(totals[0]), float(totals[1])
+
+    def basket_split(direction: str) -> list[dict]:
+        column = "exporter" if direction == "exports" else "importer"
+        rows: list[dict] = []
+        for key, codes in basket_codes.items():
+            code_list = ",".join(f"'{c}'" for c in codes)
+            value = con.execute(
+                f"""
+                SELECT COALESCE(SUM(value_kusd), 0) FROM '{paths.flows}'
+                WHERE {column} = '{country}' AND hs6 IN ({code_list})
+                """
+            ).fetchone()[0]
+            if value:
+                rows.append({"basket": key, "value_kusd": round(float(value), 1)})
+        denominator = exports_total if direction == "exports" else imports_total
+        for row in rows:
+            row["share_of_trade"] = (
+                round(row["value_kusd"] / denominator, 4) if denominator else 0.0
+            )
+        rows.sort(key=lambda r: r["value_kusd"], reverse=True)
+        return rows[:6]
+
+    return {
+        "total_exports_kusd": round(exports_total, 1),
+        "total_imports_kusd": round(imports_total, 1),
+        "top_export_baskets": basket_split("exports"),
+        "top_import_baskets": basket_split("imports"),
+    }

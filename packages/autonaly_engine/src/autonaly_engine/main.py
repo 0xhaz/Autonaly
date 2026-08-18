@@ -21,6 +21,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from .scoring import Severity, exposure_score, substitution_capacity
 from .store import (
     connect,
+    country_context,
+    country_economy,
     country_export_destinations,
     country_import_sources,
     country_totals,
@@ -306,8 +308,21 @@ def country_profile(
     exports = country_export_destinations(con, paths, codes, iso3, top_n)
     total_imports, total_exports, world_share = country_totals(con, paths, codes, iso3)
 
+    context = country_context(paths.context).get(iso3, {})
+
+    economy = country_economy(
+        con, paths, iso3, {b.key: b.codes for b in BY_KEY.values() if not b.parent}
+    )
+    gdp = (context or {}).get("gdp_usd")
+    if gdp:
+        # kUSD -> USD before comparing with GDP.
+        economy["exports_pct_gdp"] = round(economy["total_exports_kusd"] * 1000 / gdp * 100, 1)
+        economy["imports_pct_gdp"] = round(economy["total_imports_kusd"] * 1000 / gdp * 100, 1)
+
     return {
         "country": iso3,
+        "context": context or None,
+        "economy": economy,
         "baskets": keys,
         "basket_labels": [BY_KEY[k].label for k in keys],
         "total_imports_kusd": round(total_imports, 1),

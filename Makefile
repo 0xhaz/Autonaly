@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup up down logs smoke test lint fmt engine-local clean data pipeline worker replay-suez replay-malformed dlq agent ui ui-build world image parity
+.PHONY: help setup up down logs smoke test lint fmt engine-local clean data pipeline worker replay-suez replay-malformed dlq agent ui ui-build world context image parity
 
 help:  ## Show available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -67,6 +67,9 @@ ui:  ## Run the review UI on :3000 (needs the Firestore emulator)
 
 ui-build:  ## Production build of the review UI
 	cd web && npm run build
+
+context:  ## Refresh country context (World Bank WDI + CLDR currency)
+	uv run python scripts/fetch_country_context.py
 
 world:  ## Rebuild the map's world geometry from Natural Earth
 	uv run python scripts/build_world_geojson.py

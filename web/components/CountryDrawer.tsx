@@ -1,0 +1,352 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { formatKusd, formatPercent, type AffectedCountry } from "@/lib/types";
+
+/**
+ * Slide-in country encyclopedia.
+ *
+ * Two audiences share one surface. Someone who clicked a country because they
+ * were curious wants to know what the country *is* — people, economy, currency,
+ * what it trades. Someone doing resilience work wants the structure underneath:
+ * which commodity groups carry the trade, who the counterparties are, and how
+ * much of it sits with a disrupted origin. So the drawer opens on Overview and
+ * keeps the analysis one click away, rather than making either audience wade
+ * through the other's view.
+ *
+ * It overlays the map instead of sitting below it, because the map is the
+ * primary surface and scrolling away from it breaks the sense of exploring.
+ */
+
+const SERIES = "#3987e5";
+const DISRUPTED = "#d03b3b";
+
+interface Row {
+  country: string;
+  value_kusd: number;
+  share: number;
+  disrupted?: boolean;
+}
+
+interface BasketRow {
+  basket: string;
+  value_kusd: number;
+  share_of_trade: number;
+}
+
+interface Context {
+  name?: string;
+  capital?: string | null;
+  region?: string | null;
+  income_group?: string | null;
+  currency?: string | null;
+  population?: number;
+  gdp_usd?: number;
+  gdp_per_capita_usd?: number;
+  gdp_growth_pct?: number;
+  trade_pct_gdp?: number;
+  context_note?: string;
+}
+
+interface Economy {
+  total_exports_kusd: number;
+  total_imports_kusd: number;
+  exports_pct_gdp?: number;
+  imports_pct_gdp?: number;
+  top_export_baskets: BasketRow[];
+  top_import_baskets: BasketRow[];
+}
+
+interface Profile {
+  country: string;
+  context: Context | null;
+  economy: Economy;
+  basket_labels: string[];
+  total_imports_kusd: number;
+  total_exports_kusd: number;
+  world_export_share: number;
+  import_sources: Row[];
+  export_destinations: Row[];
+}
+
+const compact = (n: number) =>
+  n >= 1e12 ? `$${(n / 1e12).toFixed(2)}tn`
+  : n >= 1e9 ? `$${(n / 1e9).toFixed(0)}bn`
+  : n >= 1e6 ? `$${(n / 1e6).toFixed(0)}m`
+  : `$${n.toFixed(0)}`;
+
+const people = (n: number) =>
+  n >= 1e9 ? `${(n / 1e9).toFixed(2)}bn` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}m` : `${(n / 1e3).toFixed(0)}k`;
+
+const prettyBasket = (key: string) =>
+  key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+        {label}
+      </div>
+      <div className="mono mt-0.5 text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function BarRow({ label, share, value, flagged }: {
+  label: string;
+  share: number;
+  value: number;
+  flagged?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2 py-[3px]">
+      <span className="mono w-[7.5rem] shrink-0 truncate text-xs" title={label}>{label}</span>
+      <div className="h-[13px] flex-1">
+        <div
+          className="h-full rounded-[3px]"
+          style={{ width: `${Math.max(share * 100, 1.5)}%`, background: flagged ? DISRUPTED : SERIES }}
+        />
+      </div>
+      <span className="mono w-11 shrink-0 text-right text-xs" style={{ color: "var(--muted)" }}>
+        {(share * 100).toFixed(1)}%
+      </span>
+      <span className="mono w-14 shrink-0 text-right text-xs" style={{ color: "var(--muted)" }}>
+        {formatKusd(value)}
+      </span>
+    </div>
+  );
+}
+
+function Group({ title, children, note }: {
+  title: string;
+  children: React.ReactNode;
+  note?: string;
+}) {
+  return (
+    <section>
+      <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+        {title}
+      </h4>
+      {children}
+      {note && <p className="mt-1 text-[11px]" style={{ color: "var(--muted)" }}>{note}</p>}
+    </section>
+  );
+}
+
+export default function CountryDrawer({
+  country,
+  baskets,
+  sources,
+  exposure,
+  onClose,
+}: {
+  country: string | null;
+  baskets: string[];
+  sources: string[];
+  exposure?: AffectedCountry;
+  onClose: () => void;
+}) {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"overview" | "analysis">("overview");
+
+  const loading = country !== null && profile?.country !== country && error === null;
+
+  useEffect(() => {
+    if (!country) return;
+    let cancelled = false;
+    const query = new URLSearchParams({
+      baskets: baskets.join(","),
+      sources: sources.join(","),
+      top_n: "8",
+    });
+    fetch(`/api/country/${country}?${query}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data) => {
+        if (cancelled) return;
+        setError(null);
+        setProfile(data);
+      })
+      .catch(() => {
+        if (!cancelled) setError("No profile available for this country.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [country, baskets, sources]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const open = country !== null;
+  const ctx = profile?.context;
+  const eco = profile?.economy;
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        aria-hidden={!open}
+        style={{
+          position: "fixed",
+          inset: 0,
+          // Light enough that the map stays legible behind the drawer — the
+          // reader is still exploring a map, not filling in a modal form.
+          background: "rgba(4,8,12,0.35)",
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? "auto" : "none",
+          transition: "opacity 220ms ease",
+          zIndex: 40,
+        }}
+      />
+      <aside
+        aria-hidden={!open}
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          height: "100dvh",
+          width: "min(430px, 92vw)",
+          background: "var(--panel)",
+          borderLeft: "1px solid var(--line)",
+          transform: open ? "translateX(0)" : "translateX(100%)",
+          transition: "transform 260ms cubic-bezier(0.22,0.61,0.36,1)",
+          zIndex: 41,
+          overflowY: "auto",
+          padding: "1.1rem 1.2rem 3rem",
+        }}
+      >
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold leading-tight">
+              {ctx?.name ?? country}
+            </h2>
+            <p className="mono text-[11px]" style={{ color: "var(--muted)" }}>
+              {country}
+              {ctx?.region ? ` · ${ctx.region}` : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-md px-2 py-1 text-sm"
+            style={{ border: "1px solid var(--line)", color: "var(--muted)" }}
+          >
+            ✕
+          </button>
+        </header>
+
+        <div className="mt-3 flex gap-1 rounded-md p-0.5" style={{ background: "var(--panel-2)" }}>
+          {(["overview", "analysis"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className="flex-1 rounded-[5px] px-3 py-1.5 text-xs font-medium capitalize"
+              style={{
+                background: tab === t ? "var(--panel)" : "transparent",
+                color: tab === t ? "var(--text)" : "var(--muted)",
+                border: tab === t ? "1px solid var(--line)" : "1px solid transparent",
+              }}
+            >
+              {t === "overview" ? "Overview" : "Trade analysis"}
+            </button>
+          ))}
+        </div>
+
+        {loading && <p className="mt-4 text-xs" style={{ color: "var(--muted)" }}>loading…</p>}
+        {error && <p className="mt-4 text-xs" style={{ color: "var(--muted)" }}>{error}</p>}
+
+        {profile && !loading && tab === "overview" && (
+          <div className="mt-4 space-y-4">
+            {ctx?.context_note && (
+              <p className="rounded-md p-2 text-[11px]" style={{ background: "var(--panel-2)", color: "var(--warn)" }}>
+                {ctx.context_note}
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              {ctx?.population != null && <Fact label="Population" value={people(ctx.population)} />}
+              {ctx?.capital && <Fact label="Capital" value={ctx.capital} />}
+              {ctx?.gdp_usd != null && <Fact label="GDP" value={compact(ctx.gdp_usd)} />}
+              {ctx?.currency && <Fact label="Currency" value={ctx.currency} />}
+              {ctx?.gdp_per_capita_usd != null && (
+                <Fact label="GDP per capita" value={`$${Math.round(ctx.gdp_per_capita_usd).toLocaleString()}`} />
+              )}
+              {ctx?.gdp_growth_pct != null && <Fact label="GDP growth" value={`${ctx.gdp_growth_pct.toFixed(1)}%`} />}
+              {eco && <Fact label="Total exports" value={compact(eco.total_exports_kusd * 1000)} />}
+              {eco && <Fact label="Total imports" value={compact(eco.total_imports_kusd * 1000)} />}
+              {ctx?.income_group && <Fact label="Income group" value={ctx.income_group} />}
+              {ctx?.trade_pct_gdp != null && <Fact label="Trade / GDP" value={`${ctx.trade_pct_gdp.toFixed(0)}%`} />}
+            </div>
+
+            {eco && eco.top_export_baskets.length > 0 && (
+              <Group title="What it sells" note="Share of the country's total goods exports.">
+                {eco.top_export_baskets.slice(0, 5).map((b) => (
+                  <BarRow key={b.basket} label={prettyBasket(b.basket)} share={b.share_of_trade} value={b.value_kusd} />
+                ))}
+              </Group>
+            )}
+
+            <p className="text-[11px]" style={{ color: "var(--muted)" }}>
+              Context: World Bank WDI {ctx?.gdp_usd ? "2024" : ""} · Trade: BACI/CEPII 2024
+            </p>
+          </div>
+        )}
+
+        {profile && !loading && tab === "analysis" && (
+          <div className="mt-4 space-y-4">
+            {exposure && (
+              <div className="grid grid-cols-2 gap-3 rounded-md p-3" style={{ background: "var(--panel-2)" }}>
+                <Fact label="Exposure score" value={`${exposure.score?.toFixed(1) ?? "—"}/100`} />
+                <Fact label="At risk" value={formatKusd(exposure.value_at_risk_kusd)} />
+                <Fact label="Dependency" value={formatPercent(exposure.ddr)} />
+                <Fact label="Concentration" value={exposure.hhi?.toFixed(3) ?? "—"} />
+              </div>
+            )}
+
+            {eco && (
+              <div className="grid grid-cols-2 gap-3">
+                <Fact
+                  label="Exports / GDP"
+                  value={eco.exports_pct_gdp != null ? `${eco.exports_pct_gdp}%` : "—"}
+                />
+                <Fact
+                  label="World share, this basket"
+                  value={formatPercent(profile.world_export_share)}
+                />
+              </div>
+            )}
+
+            <Group
+              title={`Imports from · ${profile.basket_labels.length} basket${profile.basket_labels.length === 1 ? "" : "s"}`}
+              note={sources.length ? "Red marks a disrupted origin." : undefined}
+            >
+              {profile.import_sources.map((r) => (
+                <BarRow key={r.country} label={r.country} share={r.share} value={r.value_kusd} flagged={r.disrupted} />
+              ))}
+            </Group>
+
+            <Group title="Exports to">
+              {profile.export_destinations.map((r) => (
+                <BarRow key={r.country} label={r.country} share={r.share} value={r.value_kusd} />
+              ))}
+            </Group>
+
+            {eco && eco.top_import_baskets.length > 0 && (
+              <Group title="What it buys" note="Share of the country's total goods imports.">
+                {eco.top_import_baskets.slice(0, 5).map((b) => (
+                  <BarRow key={b.basket} label={prettyBasket(b.basket)} share={b.share_of_trade} value={b.value_kusd} />
+                ))}
+              </Group>
+            )}
+          </div>
+        )}
+      </aside>
+    </>
+  );
+}

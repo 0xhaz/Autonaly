@@ -271,7 +271,7 @@ export default function GlobalMap({
     <div className="space-y-2">
       <div
         ref={container}
-        className="h-[520px] w-full overflow-hidden rounded-lg"
+        className="h-[min(68vh,660px)] w-full overflow-hidden rounded-lg"
         style={{ border: "1px solid var(--line)" }}
       />
       <div

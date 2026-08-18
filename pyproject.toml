@@ -9,6 +9,7 @@ dependencies = [
     "autonaly-engine",
     "autonaly-agent",
     "autonaly-ingest",
+    "babel>=2.18.0",
 ]
 
 [dependency-groups]
