@@ -11,6 +11,9 @@ export async function POST(request: NextRequest) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       conflict: String(body.conflict ?? ""),
+      ...(Array.isArray(body.countries) && body.countries.length
+        ? { countries: body.countries.slice(0, 3).map(String) }
+        : {}),
       intensity: Math.min(1, Math.max(0.1, Number(body.intensity ?? 1))),
       duration_months: Math.min(24, Math.max(0, Math.round(Number(body.duration_months ?? 6)))),
       top_n: 20,

@@ -56,18 +56,16 @@ export default function BriefingWorkspace({
   sources: string[];
   marker?: MapMarker | null;
 }) {
-  // ISO3 -> full name, from the same geometry the map already ships. Loaded
-  // once; a code the atlas does not know falls back to itself.
+  // ISO3 -> full name. Generated from the context artifact rather than the map
+  // polygons, because city-states like Hong Kong and Singapore rank in
+  // briefings but have no drawable area in the simplified geometry.
   const [names, setNames] = useState<Record<string, string>>({});
   useEffect(() => {
     let cancelled = false;
-    fetch("/world.geo.json")
+    fetch("/country-names.json")
       .then((r) => r.json())
-      .then((w) => {
-        if (cancelled) return;
-        const map: Record<string, string> = {};
-        for (const f of w.features) map[f.properties.iso3] = f.properties.name;
-        setNames(map);
+      .then((map: Record<string, string>) => {
+        if (!cancelled) setNames(map);
       })
       .catch(() => {});
     return () => {

@@ -58,6 +58,9 @@ CONTEXT_EXCLUSIONS = {
            "Trade figures are from BACI and are unaffected.",
 }
 
+# Display names for countries the World Bank omits — an ISO code is not a name.
+EXCLUSION_NAMES = {"TWN": "Taiwan"}
+
 
 def country_metadata() -> dict[str, dict]:
     """Name, capital, region and income group, from the World Bank's own
@@ -123,8 +126,11 @@ def main() -> int:
     # trade data covers them.
     for iso3, note in CONTEXT_EXCLUSIONS.items():
         if iso3 not in real:
-            real[iso3] = {"name": iso3, "context_note": note, "currency": currency_for(
-                {"TWN": "TW"}.get(iso3))}
+            real[iso3] = {
+                "name": EXCLUSION_NAMES.get(iso3, iso3),
+                "context_note": note,
+                "currency": currency_for({"TWN": "TW"}.get(iso3)),
+            }
 
     dropped = len(meta) - len(real) if len(meta) > len(real) else 0
 

@@ -60,13 +60,13 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
 
   useEffect(() => {
     fetch("/api/meta").then((r) => r.json()).then(setMeta).catch(() => {});
-    fetch("/world.geo.json")
+    fetch("/country-names.json")
       .then((r) => r.json())
-      .then((w) =>
+      .then((names: Record<string, string>) =>
         setCountries(
-          w.features
-            .map((f: { properties: { iso3: string; name: string } }) => f.properties)
-            .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)),
+          Object.entries(names)
+            .map(([iso3, name]) => ({ iso3, name }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
         ),
       )
       .catch(() => {});

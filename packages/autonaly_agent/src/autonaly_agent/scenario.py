@@ -35,6 +35,7 @@ ABSOLUTE RULES:
   scales these figures down proportionally").
 - Do not write a citable line. A quotable sentence about a hypothetical invites
   misquotation as fact.
+- Write country names in full (China, Yemen), never as ISO codes (CHN, YEM).
 
 Write exactly these sections:
 

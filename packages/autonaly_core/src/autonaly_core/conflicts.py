@@ -117,3 +117,80 @@ RUSSIA_UKRAINE = Conflict(
 
 CONFLICTS: tuple[Conflict, ...] = (RUSSIA_UKRAINE,)
 BY_KEY: dict[str, Conflict] = {c.key: c for c in CONFLICTS}
+
+
+# ---------------------------------------------------------------------------
+# Custom conflicts, derived from the data instead of curated by hand.
+#
+# The curated scenario above encodes judgment: which channels a real war has,
+# who sanctions whom, what merely wobbles. A custom scenario cannot have that
+# judgment, so it claims less: one physical-disruption channel per selected
+# country, covering exactly the modelled baskets where that country supplies a
+# material share of world trade. The materiality floor keeps the tool honest —
+# a country below it in every basket produces no channel rather than a fake one.
+# ---------------------------------------------------------------------------
+
+# A source below 1% of world trade in a basket is not a supply-shock story for
+# that basket, however dominant the basket is for the country itself.
+CUSTOM_MATERIALITY_WORLD_SHARE = 0.01
+
+# Enough to carry a "this country's exports stop" story without dragging in
+# trace positions that dilute the blocked-products list.
+CUSTOM_MAX_BASKETS = 8
+
+CUSTOM_NOTE = (
+    "Custom scenario derived from the trade data: each selected country gets "
+    "one physical-disruption channel covering the modelled baskets where it "
+    "supplies at least 1% of world trade. Every buyer is hit — no sanctions "
+    "or coalition assumptions, because those are political judgments a data "
+    "derivation cannot make."
+)
+
+CUSTOM_OMISSIONS = (
+    "Only the 22 modelled commodity baskets are visible: services, autos, "
+    "machinery, pharmaceuticals and most manufactures are not counted, so a "
+    "crisis in a diversified manufacturing economy is understated here. No "
+    "pipeline flows, no second-order effects, no substitution dynamics."
+)
+
+
+def material_baskets(world_shares: dict[str, float]) -> list[tuple[str, float]]:
+    """The baskets where a source is a material share of world trade."""
+    rows = [
+        (basket, share)
+        for basket, share in world_shares.items()
+        if share >= CUSTOM_MATERIALITY_WORLD_SHARE
+    ]
+    rows.sort(key=lambda r: r[1], reverse=True)
+    return rows[:CUSTOM_MAX_BASKETS]
+
+
+def custom_channel(iso3: str, name: str, baskets: tuple[str, ...]) -> Channel:
+    """One country's exports stop moving — the only channel shape that can be
+    derived from trade data alone."""
+    return Channel(
+        key=f"{iso3.lower()}_disruption",
+        label=f"{name}: exports disrupted",
+        transmission="physical disruption",
+        sources=(iso3,),
+        baskets=baskets,
+        # Intensity maps straight onto the reduction: the slider is the claim.
+        default_reduction=1.0,
+        importer_filter=None,
+        note=(
+            f"Auto-derived channel: the baskets where {name} supplies at least "
+            "1% of world trade. Physical framing — every buyer is hit."
+        ),
+    )
+
+
+def build_custom_conflict(
+    channels: tuple[Channel, ...], labels: tuple[str, ...]
+) -> Conflict:
+    return Conflict(
+        key="custom",
+        label="Custom crisis: " + " + ".join(labels),
+        channels=channels,
+        note=CUSTOM_NOTE,
+        omissions=CUSTOM_OMISSIONS,
+    )

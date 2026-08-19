@@ -37,6 +37,7 @@ export async function GET() {
         }),
       ),
       conflicts: conflicts.conflicts,
+      customConflictCountries: conflicts.custom?.countries ?? [],
     });
   } catch {
     return NextResponse.json({ error: "engine unavailable" }, { status: 503 });

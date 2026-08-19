@@ -313,3 +313,38 @@ def country_economy(
         "top_export_baskets": basket_split("exports"),
         "top_import_baskets": basket_split("imports"),
     }
+
+
+def source_world_share_matrix(
+    con: duckdb.DuckDBPyConnection,
+    paths: ArtifactPaths,
+    basket_codes: dict[str, tuple[str, ...]],
+    min_share: float,
+) -> dict[str, dict[str, float]]:
+    """exporter -> {basket: share of world trade}, floored at min_share.
+
+    One scan of the flows serves both the custom-conflict builder and the
+    eligible-country list; callers cache the result per (version, year).
+    """
+    mapping_rows = ",".join(
+        f"('{code}','{basket}')"
+        for basket, codes in basket_codes.items()
+        for code in codes
+    )
+    rows = con.execute(
+        f"""
+        WITH mapping(hs6, basket) AS (VALUES {mapping_rows}),
+        by_source AS (
+            SELECT m.basket, f.exporter, SUM(f.value_kusd) AS v
+            FROM '{paths.flows}' f JOIN mapping m USING (hs6)
+            GROUP BY 1, 2
+        )
+        SELECT basket, exporter, v / SUM(v) OVER (PARTITION BY basket) AS share
+        FROM by_source
+        QUALIFY share >= {min_share}
+        """
+    ).fetchall()
+    matrix: dict[str, dict[str, float]] = {}
+    for basket, exporter, share in rows:
+        matrix.setdefault(exporter, {})[basket] = float(share)
+    return matrix

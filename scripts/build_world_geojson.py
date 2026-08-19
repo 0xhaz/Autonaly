@@ -76,7 +76,55 @@ def main() -> int:
     for check in ("TWN", "EGY", "NLD", "CHN"):
         present = any(f["properties"]["iso3"] == check for f in features)
         print(f"  {check}: {'present' if present else 'MISSING'}")
+
+    write_country_names(features)
     return 0
+
+
+# The polygon file drops city-states and micro-islands (no drawable area at
+# this simplification), but Hong Kong and Singapore still appear in rankings.
+# Names therefore come from the context artifact for everyone, with the
+# geojson's tidier names (e.g. "South Korea" over "Korea, Rep.") winning where
+# both exist, plus explicit cleanups for the World Bank's official long forms.
+WDI_NAME_CLEANUPS = {
+    "HKG": "Hong Kong",
+    "MAC": "Macao",
+    "SGP": "Singapore",
+    "BRN": "Brunei",
+    "PRK": "North Korea",
+    "KOR": "South Korea",
+    "RUS": "Russia",
+    "EGY": "Egypt",
+    "IRN": "Iran",
+    "SYR": "Syria",
+    "VEN": "Venezuela",
+    "YEM": "Yemen",
+    "CIV": "Ivory Coast",
+    "COD": "DR Congo",
+    "COG": "Republic of the Congo",
+    "KGZ": "Kyrgyzstan",
+    "LAO": "Laos",
+    "SVK": "Slovakia",
+    "TUR": "Turkey",
+    "VNM": "Vietnam",
+}
+
+
+def write_country_names(features: list[dict]) -> None:
+    context_path = REPO_ROOT / "artifacts/context/V202601/2024/countries.json"
+    names: dict[str, str] = {}
+    if context_path.exists():
+        countries = json.loads(context_path.read_text(encoding="utf-8"))["countries"]
+        names = {
+            iso3: WDI_NAME_CLEANUPS.get(iso3, row.get("name") or iso3)
+            for iso3, row in countries.items()
+        }
+    for f in features:
+        names[f["properties"]["iso3"]] = f["properties"]["name"]
+
+    out = REPO_ROOT / "web/public/country-names.json"
+    out.write_text(json.dumps(names, separators=(",", ":"), sort_keys=True), encoding="utf-8")
+    print(f"  wrote {out.relative_to(REPO_ROOT)} — {len(names)} names")
 
 
 if __name__ == "__main__":

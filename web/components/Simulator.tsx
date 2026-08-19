@@ -60,6 +60,7 @@ interface ConflictResult {
   note: string;
   omissions: string;
   intensity: number;
+  skipped?: { country: string; name: string; reason: string }[];
   channels: ConflictChannel[];
   combined: {
     country: string;
@@ -73,6 +74,12 @@ interface ConflictMeta {
   label: string;
   note: string;
   channels: { key: string; label: string }[];
+}
+
+interface CustomCountry {
+  iso3: string;
+  name: string;
+  material_baskets: number;
 }
 
 /**
@@ -109,6 +116,8 @@ export default function Simulator() {
   const [conflictKey, setConflictKey] = useState<string>("");
   const [conflictResult, setConflictResult] = useState<ConflictResult | null>(null);
   const [channelKey, setChannelKey] = useState<string>("");
+  const [customCountries, setCustomCountries] = useState<CustomCountry[]>([]);
+  const [customPicked, setCustomPicked] = useState<string[]>([]);
   // port mode
   const [portsByCountry, setPortsByCountry] = useState<Record<string, Port[]>>({});
   const [countryNames, setCountryNames] = useState<Record<string, string>>({});
@@ -133,6 +142,7 @@ export default function Simulator() {
         if (meta.chokepoints?.length) setSelected(meta.chokepoints[0].key);
         setConflicts(meta.conflicts ?? []);
         if (meta.conflicts?.length) setConflictKey(meta.conflicts[0].key);
+        setCustomCountries(meta.customConflictCountries ?? []);
       })
       .catch(() => setError("engine unavailable"));
     fetch("/layers/chokepoints.geo.json")
@@ -147,13 +157,9 @@ export default function Simulator() {
       .then((r) => r.json())
       .then((d) => setPortsByCountry(d))
       .catch(() => {});
-    fetch("/world.geo.json")
+    fetch("/country-names.json")
       .then((r) => r.json())
-      .then((w) => {
-        const names: Record<string, string> = {};
-        for (const f of w.features) names[f.properties.iso3] = f.properties.name;
-        setCountryNames(names);
-      })
+      .then((names: Record<string, string>) => setCountryNames(names))
       .catch(() => {});
   }, []);
 
@@ -195,6 +201,7 @@ export default function Simulator() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           conflict: conflictKey,
+          ...(conflictKey === "custom" ? { countries: customPicked } : {}),
           intensity: reduction / 100,
           duration_months: months,
         }),
@@ -523,9 +530,14 @@ export default function Simulator() {
                 className="w-full rounded-md px-3 py-2 text-sm"
                 style={selectStyle}
               >
-                {conflicts.map((c) => (
-                  <option key={c.key} value={c.key}>{c.label}</option>
-                ))}
+                <optgroup label="Curated scenarios">
+                  {conflicts.map((c) => (
+                    <option key={c.key} value={c.key}>{c.label}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Build your own">
+                  <option value="custom">Custom crisis — pick countries…</option>
+                </optgroup>
               </select>
             </label>
           )}
@@ -558,7 +570,7 @@ export default function Simulator() {
           <button
             type="button"
             onClick={run}
-            disabled={running || (mode === "chokepoint" ? !selected : mode === "port" ? !currentPort : !conflictKey)}
+            disabled={running || (mode === "chokepoint" ? !selected : mode === "port" ? !currentPort : conflictKey === "custom" ? customPicked.length === 0 : !conflictKey)}
             className="self-end rounded-md px-5 py-2 text-sm font-semibold"
             style={{ background: "var(--accent)", color: "#04121f", opacity: running ? 0.6 : 1 }}
           >
@@ -566,6 +578,59 @@ export default function Simulator() {
           </button>
         </div>
 
+        {mode === "conflict" && conflictKey === "custom" && (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+                Countries in crisis ({customPicked.length}/3)
+              </span>
+              {customPicked.map((iso3) => (
+                <button
+                  key={iso3}
+                  type="button"
+                  onClick={() => {
+                    setCustomPicked(customPicked.filter((c) => c !== iso3));
+                    reset();
+                  }}
+                  className="chip chip-curated"
+                  style={{ textTransform: "none", cursor: "pointer" }}
+                  title="Remove"
+                >
+                  {customCountries.find((c) => c.iso3 === iso3)?.name ?? iso3} ✕
+                </button>
+              ))}
+              {customPicked.length < 3 && (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value && !customPicked.includes(e.target.value)) {
+                      setCustomPicked([...customPicked, e.target.value]);
+                      reset();
+                    }
+                  }}
+                  className="rounded-md px-2 py-1.5 text-xs"
+                  style={selectStyle}
+                >
+                  <option value="">Add a country…</option>
+                  {customCountries
+                    .filter((c) => !customPicked.includes(c.iso3))
+                    .map((c) => (
+                      <option key={c.iso3} value={c.iso3}>
+                        {c.name} · {c.material_baskets} basket{c.material_baskets === 1 ? "" : "s"}
+                      </option>
+                    ))}
+                </select>
+              )}
+            </div>
+            <p className="rounded-md p-2.5 text-xs" style={{ background: "var(--panel-2)", color: "var(--muted)" }}>
+              Channels are derived from the trade data, not curated: each country
+              you pick gets one physical-disruption channel covering the modelled
+              baskets where it supplies at least 1% of world trade. Only countries
+              with such a position are listed — a country below that floor in
+              every basket has no defensible supply-shock story here.
+            </p>
+          </div>
+        )}
         {mode === "chokepoint" && current && (
           <p className="rounded-md p-2.5 text-xs" style={{ background: "var(--panel-2)", color: current.reroute === "none" ? "#e8a33d" : "var(--muted)" }}>
             {current.reroute === "none"
@@ -587,7 +652,7 @@ export default function Simulator() {
             ports concentrate risk.
           </p>
         )}
-        {mode === "conflict" && currentConflict && (
+        {mode === "conflict" && conflictKey !== "custom" && currentConflict && (
           <p className="rounded-md p-2.5 text-xs" style={{ background: "var(--panel-2)", color: "var(--muted)" }}>
             {currentConflict.note} A conflict is not one shock but several with
             different reach: physical destruction cuts exports to every buyer,
@@ -629,11 +694,21 @@ export default function Simulator() {
           <p className="rounded-md p-3 text-xs" style={{ background: "var(--panel)", border: "1px solid var(--line)", color: "var(--muted)" }}>
             <span style={{ color: "#e8a33d" }}>Read the numbers as marginal risk on
             today&apos;s network:</span>{" "}
-            the 2024 trade weights already embed the rewiring the real war forced —
-            Europe&apos;s pivot away from Russian seaborne energy is priced in, which
-            is why Germany ranks small and pipeline-locked Slovakia and Hungary rank
-            large. Not modelled: {conflictResult.omissions}
+            {conflictResult.conflict === "russia_ukraine"
+              ? "the 2024 trade weights already embed the rewiring the real war forced — Europe's pivot away from Russian seaborne energy is priced in, which is why Germany ranks small and pipeline-locked Slovakia and Hungary rank large. "
+              : "exposure is computed on 2024 trade weights, so it measures who depends on these flows today — not how the network would rewire under a real crisis. "}
+            Not modelled: {conflictResult.omissions}
           </p>
+
+          {(conflictResult.skipped?.length ?? 0) > 0 && (
+            <p className="rounded-md p-3 text-xs" style={{ background: "var(--panel)", border: "1px solid var(--line)", color: "#e8a33d" }}>
+              Not simulated:{" "}
+              {conflictResult.skipped!
+                .map((s) => `${s.name} — ${s.reason}`)
+                .join("; ")}
+              .
+            </p>
+          )}
 
           {deskPanel}
 

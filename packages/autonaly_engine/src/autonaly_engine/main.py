@@ -28,6 +28,7 @@ from .store import (
     country_totals,
     dependency_rows,
     importer_supplier_share,
+    source_world_share_matrix,
     supplier_shares,
     world_basket_total,
 )
@@ -378,11 +379,104 @@ def country_profile(
     }
 
 
+_SHARE_MATRIX_CACHE: dict[tuple[str, int], dict[str, dict[str, float]]] = {}
+
+
+def _share_matrix(version: str, year: int) -> dict[str, dict[str, float]]:
+    """exporter -> {basket: world share}, cached per artifact vintage. One
+    DuckDB scan serves both the eligible-country list and every custom run."""
+    from autonaly_core.baskets import BY_KEY as BASKET_KEYS
+    from autonaly_core.conflicts import CUSTOM_MATERIALITY_WORLD_SHARE
+
+    cache_key = (version, year)
+    if cache_key not in _SHARE_MATRIX_CACHE:
+        con, paths = connect(version, year)
+        _SHARE_MATRIX_CACHE[cache_key] = source_world_share_matrix(
+            con,
+            paths,
+            {k: b.codes for k, b in BASKET_KEYS.items()},
+            CUSTOM_MATERIALITY_WORLD_SHARE,
+        )
+    return _SHARE_MATRIX_CACHE[cache_key]
+
+
+def _build_custom_spec(
+    countries: list[str], version: str, year: int
+) -> tuple:
+    """(Conflict, skipped) for a user-selected country list — channels derived
+    from the data, countries with no material basket reported rather than
+    silently given an empty channel."""
+    from autonaly_core.conflicts import (
+        build_custom_conflict,
+        custom_channel,
+        material_baskets,
+    )
+
+    matrix = _share_matrix(version, year)
+    _, paths = connect(version, year)
+    context = country_context(paths.context)
+
+    channels = []
+    labels = []
+    skipped = []
+    for iso3 in countries:
+        name = context.get(iso3, {}).get("name") or iso3
+        material = material_baskets(matrix.get(iso3, {}))
+        if not material:
+            skipped.append(
+                {
+                    "country": iso3,
+                    "name": name,
+                    "reason": (
+                        "supplies under 1% of world trade in every modelled "
+                        "basket — no defensible supply-shock channel"
+                    ),
+                }
+            )
+            continue
+        channels.append(custom_channel(iso3, name, tuple(b for b, _ in material)))
+        labels.append(name)
+
+    if not channels:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "no selected country is a material supplier in any modelled basket",
+                "skipped": skipped,
+            },
+        )
+    return build_custom_conflict(tuple(channels), tuple(labels)), skipped
+
+
 @app.get("/conflicts")
 def list_conflicts() -> dict:
     from autonaly_core.conflicts import CONFLICTS
 
+    con, paths = connect(DEFAULT_VERSION, DEFAULT_YEAR)
+    context = country_context(paths.context)
+    matrix = _share_matrix(DEFAULT_VERSION, DEFAULT_YEAR)
+    eligible = sorted(
+        (
+            {
+                "iso3": iso3,
+                "name": context.get(iso3, {}).get("name") or iso3,
+                "material_baskets": len(shares),
+            }
+            for iso3, shares in matrix.items()
+            if shares
+        ),
+        key=lambda r: r["name"],
+    )
+
     return {
+        "custom": {
+            "countries": eligible,
+            "note": (
+                "Any of these countries can anchor a custom crisis: each "
+                "supplies at least 1% of world trade in one or more modelled "
+                "baskets."
+            ),
+        },
         "conflicts": [
             {
                 "key": c.key,
@@ -411,6 +505,11 @@ class ConflictRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     conflict: str
+    countries: list[str] | None = Field(
+        default=None,
+        max_length=3,
+        description="For conflict='custom': the countries whose exports are disrupted",
+    )
     intensity: float = Field(
         default=1.0,
         ge=0.1,
@@ -436,12 +535,26 @@ def compute_conflict(request: ConflictRequest) -> dict:
     from autonaly_core.baskets import BY_KEY as BASKET_KEYS
     from autonaly_core.conflicts import BY_KEY as CONFLICT_KEYS
 
-    spec = CONFLICT_KEYS.get(request.conflict)
-    if spec is None:
-        raise HTTPException(
-            status_code=422,
-            detail=f"unknown conflict {request.conflict!r}; valid: {sorted(CONFLICT_KEYS)}",
+    skipped: list[dict] = []
+    if request.conflict == "custom":
+        if not request.countries:
+            raise HTTPException(
+                status_code=422,
+                detail="conflict='custom' requires 1-3 countries",
+            )
+        spec, skipped = _build_custom_spec(
+            [c.strip().upper() for c in request.countries], request.version, request.year
         )
+    else:
+        spec = CONFLICT_KEYS.get(request.conflict)
+        if spec is None:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"unknown conflict {request.conflict!r}; "
+                    f"valid: {sorted(CONFLICT_KEYS) + ['custom']}"
+                ),
+            )
 
     con, paths = connect(request.version, request.year)
 
@@ -535,6 +648,7 @@ def compute_conflict(request: ConflictRequest) -> dict:
         "duration_months": request.duration_months,
         "channels": channels_out,
         "combined": combined_rows[: request.top_n],
+        "skipped": skipped,
         "methodology_version": METHODOLOGY_VERSION,
     }
 

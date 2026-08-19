@@ -18,10 +18,14 @@ pytestmark = pytest.mark.skipif(not DDR.exists(), reason="artifacts absent")
 
 
 @pytest.fixture(scope="module")
-def result():
+def client():
     from autonaly_engine.main import app
 
-    client = TestClient(app)
+    return TestClient(app)
+
+
+@pytest.fixture(scope="module")
+def result(client):
     response = client.post(
         "/conflict",
         json={"conflict": "russia_ukraine", "intensity": 1.0, "duration_months": 6, "top_n": 20},
@@ -88,3 +92,78 @@ class TestCombined:
 
     def test_omissions_are_stated(self, result):
         assert "gas" in result["omissions"].lower()
+
+
+def _custom(client, countries, **overrides):
+    body = {
+        "conflict": "custom",
+        "countries": countries,
+        "intensity": 1.0,
+        "duration_months": 6,
+        "top_n": 20,
+    }
+    body.update(overrides)
+    response = client.post("/conflict", json=body)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+class TestCustomConflict:
+    """Channels derived from the data, for any country the user picks."""
+
+    def test_eligible_countries_are_published(self, client):
+        custom = client.get("/conflicts").json()["custom"]
+        rows = {c["iso3"]: c for c in custom["countries"]}
+        # Major commodity suppliers must be offerable; each with a real name.
+        assert {"AUS", "BRA", "USA", "CHL", "TWN"} <= set(rows)
+        assert rows["TWN"]["name"] == "Taiwan"
+        assert rows["AUS"]["material_baskets"] >= 5
+
+    def test_australia_derives_its_real_export_profile(self, client):
+        result = _custom(client, ["AUS"])
+        products = {
+            p["basket"]: p["source_world_share"]
+            for p in result["channels"][0]["blocked_products"]
+        }
+        # Iron ore is the headline — over half of world trade — with coal and
+        # LNG behind it. This is derivation, not curation: nobody typed these in.
+        assert products["iron_ore"] > 0.5
+        assert {"coal", "lng"} <= set(products)
+        combined = [r["country"] for r in result["combined"][:4]]
+        assert combined[0] == "CHN"
+        assert set(combined) & {"JPN", "KOR"}
+
+    def test_taiwan_crisis_is_a_semiconductor_story(self, client):
+        result = _custom(client, ["TWN"])
+        baskets = [p["basket"] for p in result["channels"][0]["blocked_products"]]
+        assert baskets[0] == "semiconductors"
+        assert result["label"] == "Custom crisis: Taiwan"
+
+    def test_immaterial_country_is_skipped_with_a_reason(self, client):
+        result = _custom(client, ["AUS", "AND"])
+        assert len(result["channels"]) == 1
+        assert result["skipped"][0]["country"] == "AND"
+        assert "1%" in result["skipped"][0]["reason"]
+
+    def test_all_immaterial_is_a_422_not_an_empty_result(self, client):
+        response = client.post(
+            "/conflict",
+            json={"conflict": "custom", "countries": ["AND"], "intensity": 1.0},
+        )
+        assert response.status_code == 422
+
+    def test_custom_requires_countries(self, client):
+        response = client.post(
+            "/conflict", json={"conflict": "custom", "intensity": 1.0}
+        )
+        assert response.status_code == 422
+
+    def test_sources_are_not_their_own_victims(self, client):
+        result = _custom(client, ["AUS"])
+        for row in result["combined"]:
+            assert row["country"] != "AUS"
+
+    def test_channels_hit_every_buyer(self, client):
+        # A derived channel makes no coalition claim — reach must be global.
+        result = _custom(client, ["BRA"])
+        assert all(not c["coalition_only"] for c in result["channels"])
