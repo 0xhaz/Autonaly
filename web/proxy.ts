@@ -12,6 +12,7 @@ const isProtected = createRouteMatcher([
   "/dashboard(.*)",
   "/review(.*)",
   "/api/personalize(.*)",
+  "/api/scenario-brief(.*)",
   "/api/profile(.*)",
 ]);
 

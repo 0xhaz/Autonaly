@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .personal import personalize
+from .scenario import scenario_brief
 
 log = logging.getLogger(__name__)
 
@@ -36,6 +37,19 @@ class PersonalizeRequest(BaseModel):
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+class ScenarioRequest(BaseModel):
+    scenario: dict
+    rankings: dict
+
+
+@app.post("/scenario-brief")
+def scenario_endpoint(request: ScenarioRequest) -> dict:
+    try:
+        return scenario_brief(request.scenario, request.rankings)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.post("/personalize")

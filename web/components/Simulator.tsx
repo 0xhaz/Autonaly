@@ -1,5 +1,6 @@
 "use client";
 
+import { Show, SignInButton } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 
 import BriefingWorkspace from "@/components/BriefingWorkspace";
@@ -32,6 +33,9 @@ export default function Simulator() {
   const [rankings, setRankings] = useState<Rankings | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [brief, setBrief] = useState<string | null>(null);
+  const [briefing, setBriefing] = useState(false);
+  const [briefError, setBriefError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/meta")
@@ -62,7 +66,36 @@ export default function Simulator() {
       setError("simulation failed");
       return;
     }
+    setBrief(null);
+    setBriefError(null);
     setRankings(await response.json());
+  };
+
+  const askDesk = async () => {
+    if (!rankings || !current) return;
+    setBriefing(true);
+    setBriefError(null);
+    const response = await fetch("/api/scenario-brief", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        scenario: {
+          chokepoint: current.key,
+          label: current.label,
+          transit_reduction: reduction / 100,
+          duration_months: months,
+          reroute: current.reroute,
+        },
+        rankings,
+      }),
+    });
+    setBriefing(false);
+    if (!response.ok) {
+      setBriefError("The desk could not complete this brief.");
+      return;
+    }
+    const body = await response.json();
+    setBrief(body.narrative);
   };
 
   return (
@@ -176,6 +209,82 @@ export default function Simulator() {
             Hypothetical scenario · methodology {rankings.methodology_version} · same
             deterministic engine that scores real events · no model involved
           </p>
+          <section className="panel p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">The desk&apos;s read</h2>
+                <p className="mt-0.5 text-xs" style={{ color: "var(--muted)" }}>
+                  The analyst writes a brief for your hypothetical — same provenance
+                  guard as a real event, clearly labelled as one that never happened.
+                </p>
+              </div>
+              <Show when="signed-in">
+                {!brief && (
+                  <button
+                    type="button"
+                    onClick={askDesk}
+                    disabled={briefing}
+                    className="rounded-md px-4 py-2 text-sm font-semibold"
+                    style={{ background: "var(--accent)", color: "#04121f", opacity: briefing ? 0.6 : 1 }}
+                  >
+                    {briefing ? "The desk is reading…" : "Ask the desk about this scenario"}
+                  </button>
+                )}
+              </Show>
+              <Show when="signed-out">
+                <SignInButton mode="modal">
+                  <button
+                    type="button"
+                    className="rounded-md px-4 py-2 text-sm font-medium"
+                    style={{ border: "1px solid var(--line)", color: "var(--muted)" }}
+                  >
+                    Sign in to ask the desk
+                  </button>
+                </SignInButton>
+              </Show>
+            </div>
+
+            {briefError && (
+              <p className="mt-3 text-sm" style={{ color: "var(--danger)" }}>{briefError}</p>
+            )}
+
+            {brief && (
+              <div
+                className="mt-4 rounded-md p-4"
+                style={{ background: "var(--panel-2)", border: "1px solid var(--line)" }}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="chip" style={{ color: "#e8a33d", borderColor: "color-mix(in srgb, #e8a33d 40%, transparent)" }}>
+                    hypothetical
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+                    every figure engine-verified
+                  </span>
+                </div>
+                <div className="narrative">
+                  {brief.split("\n").map((line, i) => {
+                    const t = line.trim();
+                    if (!t) return null;
+                    const m = t.match(/^\*\*(.+?)\*\*\s*(.*)$/);
+                    if (m) {
+                      return (
+                        <p key={i} className="mt-2 text-sm" style={{ color: "#cdd9e8" }}>
+                          <strong style={{ color: "var(--text)" }}>{m[1]}</strong>{" "}
+                          {m[2]}
+                        </p>
+                      );
+                    }
+                    return (
+                      <p key={i} className="mt-1.5 text-sm" style={{ color: "#cdd9e8" }}>
+                        {t.replace(/\*\*/g, "")}
+                      </p>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+
           <BriefingWorkspace
             // Remount per scenario: the map builds its style once, so a fresh
             // run must not inherit the previous run's shading.
