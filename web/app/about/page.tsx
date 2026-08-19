@@ -46,13 +46,13 @@ const SURFACES: { title: string; href: string; body: string }[] = [
     title: "Scenario simulator",
     href: "/simulate",
     body:
-      "Public. Stress-test a strait before the news does. Deterministic and instant — then ask the desk for its read of your hypothetical, clearly labelled as one.",
+      "Public. Stress-test a chokepoint, a port, or a whole conflict — including a custom crisis in any of 88 countries, with disruption channels derived from the trade data rather than curated. Then ask the desk for its read.",
   },
   {
     title: "Your analyst",
     href: "/dashboard",
     body:
-      "Sign in and configure a personal analyst — the commodities, countries and chokepoints it watches. When an event touches your watchlist, its note is waiting before you ask.",
+      "Sign in and configure a personal analyst — the commodities, countries and chokepoints it watches. When an event touches your watchlist, its note is waiting before you ask. Your saved scenarios live here too.",
   },
   {
     title: "Review queue",
@@ -117,6 +117,26 @@ export default function AboutPage() {
       </section>
 
       <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Speculate on the next crisis</h2>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
+          The desk reacts to events; an analyst gets paid to think ahead of them.
+          Read the political news, pick the country you think breaks next, and the
+          simulator builds the crisis for you: every commodity where that country
+          supplies at least 1% of world trade becomes a disruption channel, and the
+          engine ranks who gets hurt, by how much, in dollars. Ask the desk for a
+          written read, save the scenario to your dashboard, and export the brief as
+          Markdown for your own report. Reopening a saved scenario replays it on the
+          live engine — the numbers are reproducible, not remembered.
+        </p>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
+          The judgment stays yours. The desk deliberately refuses to say how likely
+          your scenario is — it computes exposure, states what the model cannot see,
+          and leaves the probability, the timing and the conclusion to the person
+          whose name goes on the summary.
+        </p>
+      </section>
+
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold">Four surfaces</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {SURFACES.map((surface) => (
@@ -138,8 +158,9 @@ export default function AboutPage() {
         <h2 className="text-lg font-semibold">The data, and its limits</h2>
         <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
           11.25 million bilateral trade rows from CEPII BACI, 22 curated commodity
-          baskets, live vessel transits for 28 chokepoints from IMF PortWatch, and
-          country context from the World Bank. Every exposure figure uses latest-year
+          baskets, live vessel transits for 28 chokepoints from IMF PortWatch,
+          country context from the World Bank, and 88 countries with a large enough
+          world-trade position to anchor a custom crisis scenario. Every exposure figure uses latest-year
           trade weights and models first-order effects only — no inventories, no
           substitution, no probabilities. Those limits are stated on every page that
           shows a number, because a reference product that hides its assumptions is
@@ -158,7 +179,8 @@ export default function AboutPage() {
         <div>
           <h2 className="text-base font-semibold">Hire your own analyst</h2>
           <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-            Tell it what to watch. It reads every event so you don&apos;t have to.
+            Tell it what to watch — it reads every event so you don&apos;t have to.
+            Then speculate on the next one before it happens.
           </p>
         </div>
         <div className="flex gap-2">
