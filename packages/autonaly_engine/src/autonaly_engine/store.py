@@ -77,6 +77,7 @@ def dependency_rows(
     sources: tuple[str, ...],
     min_import_kusd: float,
     importers: tuple[str, ...] | None = None,
+    exclude_importers: tuple[str, ...] = (),
 ) -> list[tuple]:
     """Per importer: share of basket imports from the disrupted sources, plus HHI.
 
@@ -95,6 +96,16 @@ def dependency_rows(
         if importers
         else ""
     )
+    # A country behind a chokepoint buying from its co-sources does not route
+    # that trade through the strait — Qatar's imports from Saudi Arabia are
+    # intra-Gulf and never see Hormuz. Without this, a source state ranks as a
+    # victim of its own chokepoint's closure.
+    if exclude_importers:
+        importer_clause += (
+            " AND importer NOT IN ("
+            + ",".join(f"'{i}'" for i in exclude_importers)
+            + ")"
+        )
 
     return con.execute(
         f"""

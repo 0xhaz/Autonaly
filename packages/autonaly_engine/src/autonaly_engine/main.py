@@ -81,6 +81,14 @@ class ExposureRequest(BaseModel):
         default=None,
         description="Restrict to these importers. None means global.",
     )
+    exclude_importers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Importers to drop from the ranking — on the chokepoint route, the "
+            "source countries themselves, whose inbound trade sits behind the "
+            "strait rather than transiting it."
+        ),
+    )
     attenuation: float = Field(
         default=1.0,
         ge=0,
@@ -181,6 +189,7 @@ def compute_exposure(request: ExposureRequest) -> Rankings:
             sources,
             floor,
             importers=tuple(request.importers) if request.importers else None,
+            exclude_importers=tuple(request.exclude_importers),
         )
     except duckdb.Error as exc:  # pragma: no cover - surfaced as 503 for the agent
         raise HTTPException(status_code=503, detail=f"artifacts unavailable: {exc}") from exc
@@ -425,6 +434,7 @@ def compute_chokepoint_exposure(request: ChokepointRequest) -> Rankings:
             ),
             top_n=request.top_n,
             importers=list(cp.importer_filter) if cp.importer_filter else None,
+            exclude_importers=list(cp.source_countries),
             attenuation=cp.attenuation(),
             version=request.version,
             year=request.year,

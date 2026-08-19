@@ -134,6 +134,26 @@ class TestHormuzGeography:
         assert len(top & {"JPN", "KOR", "IND", "PAK", "THA"}) >= 3
 
 
+class TestSourcesAreNotTheirOwnVictims:
+    """Found in a user's simulator run: Qatar ranked as a casualty of the Hormuz
+    closure it sits behind. Its 'exposure' was imports from Saudi Arabia and the
+    UAE — intra-Gulf trade that never transits the strait."""
+
+    def test_no_gulf_state_in_the_hormuz_ranking(self, client):
+        result = _chokepoint(
+            client, chokepoint="hormuz", transit_reduction=1.0, duration_months=6, top_n=200
+        )
+        countries = {a["country"] for a in result["affected"]}
+        assert not countries & {"QAT", "SAU", "ARE", "IRQ", "KWT", "IRN", "BHR"}
+
+    def test_no_source_in_the_suez_ranking(self, client):
+        result = _chokepoint(client, top_n=200)
+        countries = {a["country"] for a in result["affected"]}
+        # Egypt is a Suez *destination*, not a source — it must stay.
+        assert "EGY" in countries
+        assert not countries & {"CHN", "IND", "SAU", "ARE"}
+
+
 class TestRelativeMaterialityFloor:
     """A flat floor cannot serve baskets spanning three orders of magnitude."""
 
