@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import Simulator from "@/components/Simulator";
 
 export default function SimulatePage() {
@@ -9,7 +11,10 @@ export default function SimulatePage() {
           Stress-test a strait before the news does — deterministic, instant, no AI in the loop
         </p>
       </div>
-      <Simulator />
+      {/* Suspense: Simulator reads ?saved= via useSearchParams */}
+      <Suspense>
+        <Simulator />
+      </Suspense>
     </div>
   );
 }

@@ -15,6 +15,15 @@ import type { Briefing } from "@/lib/types";
  * because an analyst that only ever cries wolf is not one worth having.
  */
 
+interface SavedScenario {
+  id: string;
+  mode: "chokepoint" | "port" | "conflict";
+  label: string;
+  headline: string;
+  brief: string | null;
+  created_at: string;
+}
+
 interface Profile {
   analyst_name: string;
   baskets: string[];
@@ -134,6 +143,74 @@ function EventCard({ briefing }: { briefing: Briefing }) {
   );
 }
 
+function SavedScenarios() {
+  const [scenarios, setScenarios] = useState<SavedScenario[]>([]);
+  const load = useCallback(() => {
+    fetch("/api/scenarios")
+      .then((r) => r.json())
+      .then((body) => setScenarios(body.scenarios ?? []))
+      .catch(() => {});
+  }, []);
+  useEffect(load, [load]);
+
+  const remove = async (id: string) => {
+    await fetch(`/api/scenarios/${id}`, { method: "DELETE" });
+    setScenarios(scenarios.filter((s) => s.id !== id));
+  };
+
+  if (scenarios.length === 0) return null;
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+        Saved scenarios · your speculation, replayable
+      </h2>
+      <div className="grid gap-3 md:grid-cols-2">
+        {scenarios.map((s) => (
+          <div key={s.id} className="panel space-y-2 p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <span className="chip chip-computed" style={{ textTransform: "none" }}>
+                  {s.mode === "conflict" ? "Conflict" : s.mode === "port" ? "Port blockage" : "Chokepoint"}
+                </span>
+                {s.brief && (
+                  <span className="chip chip-curated ml-1.5" style={{ textTransform: "none" }}>
+                    desk brief
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => remove(s.id)}
+                className="text-xs"
+                style={{ color: "var(--muted)" }}
+                title="Delete"
+              >
+                ✕
+              </button>
+            </div>
+            <div>
+              <div className="text-sm font-semibold">{s.label}</div>
+              <div className="mono mt-0.5 text-[11px]" style={{ color: "var(--muted)" }}>
+                {s.headline}
+                {s.headline ? " · " : ""}
+                saved {s.created_at.slice(0, 10)}
+              </div>
+            </div>
+            <Link
+              href={`/simulate?saved=${s.id}`}
+              className="inline-block rounded-md px-3 py-1.5 text-xs font-medium"
+              style={{ border: "1px solid var(--line)", color: "var(--text)" }}
+            >
+              Reopen — replays on the live engine
+            </Link>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function PersonalDashboard({ briefings }: { briefings: Briefing[] }) {
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [editing, setEditing] = useState(false);
@@ -153,13 +230,20 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
 
   if (profile === null || editing) {
     return (
-      <AnalystBuilder
-        initial={profile}
-        onSaved={() => {
-          setEditing(false);
-          load();
-        }}
-      />
+      <div className="space-y-8">
+        <AnalystBuilder
+          initial={profile}
+          onSaved={() => {
+            setEditing(false);
+            load();
+          }}
+        />
+        {/* Saved simulator work exists independently of the analyst — a user
+            who speculated before hiring one must still find it here. */}
+        <div className="mx-auto max-w-4xl">
+          <SavedScenarios />
+        </div>
+      </div>
     );
   }
 
@@ -179,6 +263,8 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
           Edit watchlist
         </button>
       </header>
+
+      <SavedScenarios />
 
       <section className="space-y-3">
         <h2 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>

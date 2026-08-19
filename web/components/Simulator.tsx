@@ -1,7 +1,8 @@
 "use client";
 
 import { Show, SignInButton } from "@clerk/nextjs";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import BriefingWorkspace from "@/components/BriefingWorkspace";
 import { formatKusd, type Rankings } from "@/lib/types";
@@ -133,6 +134,17 @@ export default function Simulator() {
   const [brief, setBrief] = useState<string | null>(null);
   const [briefing, setBriefing] = useState(false);
   const [briefError, setBriefError] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [copied, setCopied] = useState(false);
+  // A scenario reopened from the dashboard: params are applied to state, the
+  // deterministic engine replays the run, and the stored brief (the one thing
+  // that cannot be recomputed) is restored after the results land.
+  const searchParams = useSearchParams();
+  const autoRunRef = useRef(false);
+  const savedBriefRef = useRef<string | null>(null);
+  // Concurrency guard: StrictMode double-mounts and double-clicks must not
+  // issue two engine calls for one intent.
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
     fetch("/api/meta")
@@ -163,6 +175,31 @@ export default function Simulator() {
       .catch(() => {});
   }, []);
 
+  const savedId = searchParams.get("saved");
+  useEffect(() => {
+    if (!savedId) return;
+    fetch(`/api/scenarios/${savedId}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(({ scenario }) => {
+        const p = scenario.params as Record<string, unknown>;
+        setMode(scenario.mode);
+        setReduction(Number(p.reduction ?? 100));
+        setMonths(Number(p.months ?? 3));
+        if (scenario.mode === "chokepoint") setSelected(String(p.selected ?? ""));
+        if (scenario.mode === "port") {
+          setPortCountry(String(p.portCountry ?? "NLD"));
+          setPortName(String(p.portName ?? ""));
+        }
+        if (scenario.mode === "conflict") {
+          setConflictKey(String(p.conflictKey ?? ""));
+          setCustomPicked(Array.isArray(p.countries) ? p.countries.map(String) : []);
+        }
+        savedBriefRef.current = scenario.brief ?? null;
+        autoRunRef.current = true;
+      })
+      .catch(() => setError("saved scenario unavailable"));
+  }, [savedId]);
+
   const current = chokepoints.find((c) => c.key === selected);
   const currentConflict = conflicts.find((c) => c.key === conflictKey);
   const currentChannel = conflictResult?.channels.find((c) => c.key === channelKey);
@@ -182,6 +219,7 @@ export default function Simulator() {
   const currentPort = ports.find((p) => p.name === portName) ?? ports[0];
 
   const reset = () => {
+    setSaveState("idle");
     setRankings(null);
     setAssumption(null);
     setConflictResult(null);
@@ -190,10 +228,13 @@ export default function Simulator() {
   };
 
   const run = async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setRunning(true);
     setError(null);
-    setBrief(null);
+    if (!savedBriefRef.current) setBrief(null);
     setBriefError(null);
+    setSaveState("idle");
 
     if (mode === "conflict") {
       const response = await fetch("/api/simulate-conflict", {
@@ -207,6 +248,7 @@ export default function Simulator() {
         }),
       });
       setRunning(false);
+      inFlightRef.current = false;
       if (!response.ok) {
         setError("simulation failed");
         return;
@@ -215,6 +257,10 @@ export default function Simulator() {
       setConflictResult(data);
       setChannelKey(data.channels[0]?.key ?? "");
       setRankings(null);
+      if (savedBriefRef.current) {
+        setBrief(savedBriefRef.current);
+        savedBriefRef.current = null;
+      }
       return;
     }
 
@@ -244,6 +290,7 @@ export default function Simulator() {
       body: JSON.stringify(body),
     });
     setRunning(false);
+    inFlightRef.current = false;
     if (!response.ok) {
       setError("simulation failed");
       return;
@@ -251,7 +298,30 @@ export default function Simulator() {
     const data = await response.json();
     setAssumption(data.assumption?.note ?? null);
     setRankings(data);
+    if (savedBriefRef.current) {
+      setBrief(savedBriefRef.current);
+      savedBriefRef.current = null;
+    }
   };
+
+  useEffect(() => {
+    if (!autoRunRef.current) return;
+    const ready =
+      mode === "chokepoint"
+        ? Boolean(current)
+        : mode === "port"
+          ? Boolean(currentPort)
+          : conflictKey === "custom"
+            ? customPicked.length > 0
+            : Boolean(currentConflict);
+    if (!ready) return;
+    autoRunRef.current = false;
+    // Deferred so the replay's state updates start outside the effect pass.
+    const timer = setTimeout(() => void run(), 0);
+    return () => clearTimeout(timer);
+    // run() is recreated per render; the ref guard makes this fire once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, current, currentPort, conflictKey, customPicked, currentConflict]);
 
   const askDesk = async () => {
     if (mode === "conflict" && conflictResult) {
@@ -339,6 +409,56 @@ export default function Simulator() {
     color: "var(--text)",
   } as const;
 
+  const saveScenario = async () => {
+    setSaveState("saving");
+    const name = (iso3: string) => countryNames[iso3] ?? iso3;
+    const [label, headline, params] =
+      mode === "chokepoint"
+        ? [
+            current?.label ?? "Chokepoint",
+            rankings
+              ? `${name(rankings.largest_absolute_exposure ?? "")} largest · ${rankings.affected.length} ranked`
+              : "",
+            { selected, reduction, months },
+          ]
+        : mode === "port"
+          ? [
+              `Port of ${currentPort?.name} (${name(portCountry)})`,
+              rankings
+                ? `${name(rankings.largest_absolute_exposure ?? "")} largest · ${rankings.affected.length} ranked`
+                : "",
+              { portCountry, portName: currentPort?.name, reduction, months },
+            ]
+          : [
+              conflictResult?.label ?? "Conflict",
+              conflictResult?.combined[0]
+                ? `${name(conflictResult.combined[0].country)} ${formatKusd(conflictResult.combined[0].total_value_at_risk_kusd)} at risk · ${conflictResult.channels.length} channel${conflictResult.channels.length === 1 ? "" : "s"}`
+                : "",
+              { conflictKey, countries: customPicked, reduction, months },
+            ];
+    const response = await fetch("/api/scenarios", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode, label, headline, params, brief }),
+    });
+    setSaveState(response.ok ? "saved" : "error");
+  };
+
+  const copyBrief = async () => {
+    if (!brief) return;
+    const label =
+      mode === "conflict"
+        ? conflictResult?.label
+        : mode === "chokepoint"
+          ? current?.label
+          : `Port of ${currentPort?.name}`;
+    await navigator.clipboard.writeText(
+      `# ${label} — hypothetical scenario\n\n${brief}\n\n— Autonaly scenario desk · every figure engine-verified · this event never happened`,
+    );
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   // The desk's-read panel is identical across chokepoint, port, and conflict
   // results — one definition, rendered wherever a result exists.
   const deskPanel = (
@@ -352,17 +472,45 @@ export default function Simulator() {
               </p>
             </div>
             <Show when="signed-in">
-              {!brief && (
+              <div className="flex flex-wrap items-center gap-2">
+                {!brief && (
+                  <button
+                    type="button"
+                    onClick={askDesk}
+                    disabled={briefing}
+                    className="rounded-md px-4 py-2 text-sm font-semibold"
+                    style={{ background: "var(--accent)", color: "#04121f", opacity: briefing ? 0.6 : 1 }}
+                  >
+                    {briefing ? "The desk is reading…" : "Ask the desk about this scenario"}
+                  </button>
+                )}
+                {brief && (
+                  <button
+                    type="button"
+                    onClick={copyBrief}
+                    className="rounded-md px-4 py-2 text-sm font-medium"
+                    style={{ border: "1px solid var(--line)", color: "var(--muted)" }}
+                  >
+                    {copied ? "Copied" : "Copy as Markdown"}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={askDesk}
-                  disabled={briefing}
-                  className="rounded-md px-4 py-2 text-sm font-semibold"
-                  style={{ background: "var(--accent)", color: "#04121f", opacity: briefing ? 0.6 : 1 }}
+                  onClick={saveScenario}
+                  disabled={saveState === "saving" || saveState === "saved"}
+                  className="rounded-md px-4 py-2 text-sm font-medium"
+                  style={{
+                    border: "1px solid var(--line)",
+                    color: saveState === "saved" ? "var(--ok)" : "var(--text)",
+                  }}
                 >
-                  {briefing ? "The desk is reading…" : "Ask the desk about this scenario"}
+                  {saveState === "saving"
+                    ? "Saving…"
+                    : saveState === "saved"
+                      ? "Saved to dashboard"
+                      : "Save to dashboard"}
                 </button>
-              )}
+              </div>
             </Show>
             <Show when="signed-out">
               <SignInButton mode="modal">

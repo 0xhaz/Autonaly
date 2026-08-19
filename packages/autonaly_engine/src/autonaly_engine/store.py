@@ -61,13 +61,29 @@ def country_context(context_path: str) -> dict[str, dict]:
 
 
 @functools.lru_cache(maxsize=1)
-def connect(version: str, year: int) -> tuple[duckdb.DuckDBPyConnection, ArtifactPaths]:
-    """One connection per process. Cloud Run instances are single-tenant."""
+def _base_connection(version: str, year: int) -> tuple[duckdb.DuckDBPyConnection, ArtifactPaths]:
     settings = get_settings()
     con = duckdb.connect()
     if not settings.is_local:
         con.execute("INSTALL httpfs; LOAD httpfs;")
     return con, ArtifactPaths.build(settings, version, year)
+
+
+def connect(version: str, year: int) -> tuple[duckdb.DuckDBPyConnection, ArtifactPaths]:
+    """A cursor per caller over one cached base connection.
+
+    A DuckDB connection is not safe for concurrent queries, and FastAPI runs
+    sync endpoints in a thread pool — two simultaneous requests on a shared
+    connection interleave their result sets (observed as `could not convert
+    string to float: 'THA'`). Cursors are cheap child connections to the same
+    database, so each request gets its own.
+    """
+    con, paths = _base_connection(version, year)
+    cursor = con.cursor()
+    if not get_settings().is_local:
+        # Extension loads are per-connection; the cursor needs its own.
+        cursor.execute("LOAD httpfs;")
+    return cursor, paths
 
 
 def dependency_rows(
