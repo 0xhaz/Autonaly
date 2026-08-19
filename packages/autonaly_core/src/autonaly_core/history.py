@@ -978,6 +978,265 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "(armed guards, convoys) becomes permanent overhead.",
         (), ("suez", "bab_el_mandeb"),
     ),
+    CrisisEvent(
+        "sudan-sanctions", "US sanctions on Sudan", 1997, 2017,
+        ("SDN",), "sanctions",
+        "Two decades of US sanctions cut Sudan out of dollar trade and "
+        "finance over Darfur and terrorism designations; oil development "
+        "proceeded anyway, led by Chinese operators outside the sanctions "
+        "net.",
+        "A unilateral financial embargo redirects a resource economy toward "
+        "whichever great power stays — sanctions choose the customer, not "
+        "the outcome.",
+        ("crude_oil",),
+    ),
+    CrisisEvent(
+        "sudan-oil-split", "South Sudan secession and the oil shutdown", 2011, 2013,
+        ("SDN", "SSD"), "revolution",
+        "Secession left three-quarters of the oil in landlocked South Sudan "
+        "and the only export pipeline in Sudan; a transit-fee dispute led "
+        "Juba to shut its entire production for over a year.",
+        "Partition can turn one export chain into two hostile halves — the "
+        "wellhead and the port become mutual hostages.",
+        ("crude_oil",),
+    ),
+    CrisisEvent(
+        "sudan-civil-war", "Sudanese civil war", 2023, None,
+        ("SDN",), "war",
+        "War between the army and the RSF wrecked Khartoum, disputed Port "
+        "Sudan's Red Sea coast, disrupted South Sudan's oil transit and cut "
+        "exports of gum arabic — a Sudanese near-monopoly hidden inside most "
+        "of the world's soft drinks.",
+        "Niche near-monopolies hide three tiers deep in supply chains; the "
+        "war reveals them when procurement teams start googling gum arabic.",
+        ("crude_oil",), ("bab_el_mandeb",),
+    ),
+    CrisisEvent(
+        "vietnam-war", "Vietnam War and the mining of Haiphong", 1964, 1975,
+        ("VNM",), "war",
+        "A decade of war devastated Vietnamese agriculture and trade; the "
+        "1972 aerial mining of Haiphong harbour closed the North's main "
+        "port overnight at trivial cost to the attacker.",
+        "Mining a harbour is the cheapest blockade there is — closure by a "
+        "single sortie, clearance by months of sweeping.",
+        ("rice",),
+    ),
+    CrisisEvent(
+        "uk-miners", "UK miners' strikes and the Three-Day Week", 1972, 1974,
+        ("GBR",), "strike",
+        "Coal strikes against a coal-fired grid forced Britain onto a "
+        "three-day industrial week in early 1974 and brought down the "
+        "government that imposed it.",
+        "A strike in the energy sector is a national supply shock — the "
+        "picket line reaches every factory on the grid.",
+        ("coal",),
+    ),
+    CrisisEvent(
+        "angola-civil-war", "Angolan civil war", 1975, 2002,
+        ("AGO",), "war",
+        "Twenty-seven years of civil war destroyed inland infrastructure "
+        "and diamond regions, yet offshore oil production grew throughout — "
+        "guarded enclaves exporting straight to tankers.",
+        "Offshore enclaves can export through a civil war that razes "
+        "everything onshore — geography of the wells decides what survives.",
+        ("crude_oil",),
+    ),
+    CrisisEvent(
+        "algeria-dark-decade", "Algerian civil war", 1992, 2002,
+        ("DZA",), "war",
+        "A decade of insurgency killed perhaps two hundred thousand, yet "
+        "gas exports to Europe continued from militarized Saharan fields "
+        "and coastal terminals — including through the 1990s expansion of "
+        "the Maghreb pipelines.",
+        "Hydrocarbon exports can be run as securitized islands inside a "
+        "war — but every euro of that gas also funded one side of it.",
+        ("lng",),
+    ),
+    CrisisEvent(
+        "apartheid-sanctions", "Apartheid sanctions and disinvestment", 1985, 1991,
+        ("ZAF",), "sanctions",
+        "Trade sanctions and a disinvestment wave hit South African coal, "
+        "steel and finance; the state doubled down on Sasol's coal-to-fuel "
+        "synfuels, built precisely against oil embargoes.",
+        "Long embargoes industrialize the target's workarounds — the "
+        "substitution plants outlive the sanctions by decades.",
+        ("coal",),
+    ),
+    CrisisEvent(
+        "za-unrest-2021", "South African unrest and the Transnet cyberattack", 2021, 2021,
+        ("ZAF",), "strike",
+        "July riots closed the Durban port corridor, and a ransomware "
+        "attack days later froze Transnet's container terminals nationwide "
+        "— a double outage at the gateway for the region's minerals.",
+        "Civil unrest and cyberattack hitting one logistics monopoly reveal "
+        "that a country's entire trade can share a single point of failure.",
+        ("coal",),
+    ),
+    CrisisEvent(
+        "congo-wars", "Second Congo War", 1998, 2003,
+        ("COD",), "war",
+        "Africa's deadliest modern war drew in nine countries and was "
+        "financed substantially by contested minerals — copper, cobalt, "
+        "coltan — whose extraction continued through the fighting.",
+        "Mineral wealth doesn't stop wars, it funds them — supply "
+        "continuity and conflict finance can be the same flow.",
+        ("cobalt",),
+    ),
+    CrisisEvent(
+        "niger-delta", "Niger Delta militancy", 2006, 2009,
+        ("NGA",), "war",
+        "MEND attacks on pipelines and platforms shut in as much as a "
+        "quarter of Nigerian oil output at the peak; an amnesty programme "
+        "bought a fragile recovery that pipeline theft still erodes.",
+        "Militias don't need to hold territory to cut supply — a wrench on "
+        "a pipeline prices like a war, and the amnesty becomes a recurring "
+        "ransom.",
+        ("crude_oil", "lng"),
+    ),
+    CrisisEvent(
+        "mexico-oil-1938", "Mexican oil expropriation", 1938, 1942,
+        ("MEX",), "revolution",
+        "Mexico nationalized the foreign oil majors; the companies' boycott "
+        "of Mexican crude cut its exports until wartime demand and a US "
+        "settlement reopened markets.",
+        "The buyers' boycott is the standard answer to nationalization — "
+        "Iran 1951 and Chile 1971 replayed this script.",
+        ("crude_oil",),
+    ),
+    CrisisEvent(
+        "bolivia-gas-wars", "Bolivian gas wars", 2003, 2005,
+        ("BOL",), "revolution",
+        "Plans to export gas through Chilean ports — the neighbour that "
+        "took Bolivia's coast in 1879 — brought down two presidents and "
+        "led to renationalization of the gas fields.",
+        "An export route can be politically impossible even when it is the "
+        "only economic one — historical grievance is infrastructure.",
+        ("lng",),
+    ),
+    CrisisEvent(
+        "civ-cocoa", "Ivorian post-election crisis and cocoa ban", 2010, 2011,
+        ("CIV",), "export_ban",
+        "The disputed election ended with the challenger ordering a cocoa "
+        "export ban — a third of world supply — to starve the incumbent of "
+        "revenue; EU port sanctions reinforced it until the standoff broke.",
+        "In a contested state, the export crop is the treasury — whoever "
+        "can stop it wins, so both sides will weaponize it.",
+    ),
+    CrisisEvent(
+        "guinea-coup", "Guinean coup and the bauxite scare", 2021, 2022,
+        ("GIN",), "revolution",
+        "A coup in the supplier of a quarter of the world's bauxite — the "
+        "ore behind aluminium — spiked alumina prices before the junta, "
+        "dependent on mining revenue, kept shipments flowing.",
+        "Coup plotters need the mine's revenue more than the old regime "
+        "did — regime change often threatens supply less than markets "
+        "price.",
+        ("aluminium",),
+    ),
+    CrisisEvent(
+        "mozambique-lng", "Cabo Delgado insurgency and the LNG halt", 2021, 2024,
+        ("MOZ",), "war",
+        "An insurgent attack on Palma forced TotalEnergies to declare force "
+        "majeure on a $20bn LNG project days after financing closed; the "
+        "capacity markets had penciled in for mid-decade slipped by years.",
+        "Insurgency doesn't just cut supply — it deletes future capacity "
+        "that price curves had already assumed.",
+        ("lng",),
+    ),
+    CrisisEvent(
+        "tigray-war", "Tigray war and blockade", 2020, 2022,
+        ("ETH", "ERI"), "war",
+        "War in northern Ethiopia included an effective aid and commerce "
+        "blockade of Tigray for over a year; sesame and coffee exports fell "
+        "and famine conditions returned to the region of the 1980s crisis.",
+        "Internal blockades repeat with the same geography a generation "
+        "apart — the roads that starved a region once can do it again.",
+    ),
+    CrisisEvent(
+        "western-sahara", "Green March and the Western Sahara war", 1975, 1991,
+        ("MAR",), "war",
+        "Morocco annexed Western Sahara and its Bou Craa phosphate mine; "
+        "Polisario sabotage cut the conveyor to the coast repeatedly, and "
+        "the territory's phosphates remain under disputed sovereignty.",
+        "Reserve concentration under disputed sovereignty is a permanent "
+        "supply question — every buyer of the ore buys the dispute.",
+        ("phosphate_fertilizer",),
+    ),
+    CrisisEvent(
+        "india-pl480", "India's ship-to-mouth years", 1965, 1967,
+        ("IND", "USA"), "drought",
+        "Back-to-back monsoon failures left India dependent on US PL-480 "
+        "wheat shipments that Washington rationed monthly for diplomatic "
+        "leverage; the humiliation launched the Green Revolution.",
+        "Food aid is leverage, and recipients know it — dependence this "
+        "sharp gets answered with a national self-sufficiency program.",
+        ("wheat",),
+    ),
+    CrisisEvent(
+        "pakistan-floods", "Pakistan superfloods", 2022, 2023,
+        ("PAK",), "disaster",
+        "Monsoon floods submerged a third of the country, destroying "
+        "cotton and rice crops, while reserve exhaustion made LNG cargoes "
+        "unaffordable at war-inflated prices — a climate and balance-of-"
+        "payments crisis compounding.",
+        "Climate disaster plus a weak currency is Sri Lanka's lesson at "
+        "scale — the flood decides what's lost, the reserves decide what "
+        "can be replaced.",
+        ("rice", "lng"),
+    ),
+    CrisisEvent(
+        "argentina-export-taxes", "Argentina's export-restriction era", 2006, 2015,
+        ("ARG",), "export_ban",
+        "Recurring export taxes, quotas and outright bans on wheat, maize "
+        "and beef — meant to hold down domestic prices — shrank plantings "
+        "and forfeited Argentina's rank among wheat exporters for a decade.",
+        "Taxing the export crop is eating the seed corn: the world market "
+        "share, once surrendered, is bought by competitors for good.",
+        ("wheat", "maize", "soybeans"),
+    ),
+    CrisisEvent(
+        "brazil-truckers", "Brazilian truckers' strike", 2018, 2018,
+        ("BRA",), "strike",
+        "A ten-day national truckers' strike over diesel prices paralyzed "
+        "soy, grain and meat exports, emptied supermarket shelves and "
+        "grounded flights — in a country whose freight is overwhelmingly "
+        "road-borne.",
+        "A commodity superpower with one freight mode has one strike "
+        "between it and stoppage — modal concentration is chokepoint risk "
+        "on land.",
+        ("soybeans", "maize"),
+    ),
+    CrisisEvent(
+        "mississippi-drought", "Mississippi River low-water crisis", 2022, 2023,
+        ("USA",), "drought",
+        "Record low water halved barge drafts on the river that carries "
+        "most US grain exports to the Gulf just as harvest peaked; freight "
+        "rates spiked several-fold and fertilizer moved upstream late.",
+        "A river is infrastructure with no backup — when the water level "
+        "is the constraint, no investment fixes this season.",
+        ("maize", "soybeans"),
+    ),
+    CrisisEvent(
+        "rhine-drought", "Rhine low-water crisis", 2022, 2022,
+        ("DEU", "CHE", "NLD"), "drought",
+        "Drought cut Rhine barge loads to a fraction in the middle of the "
+        "energy crisis, strangling coal deliveries to power plants and "
+        "chemical feedstocks along Europe's industrial artery.",
+        "Climate stress finds the oldest infrastructure first — Europe's "
+        "industrial heart still runs on a river's water level.",
+        ("coal",),
+    ),
+    CrisisEvent(
+        "china-power-crunch", "China's power crunch", 2021, 2021,
+        ("CHN",), "export_ban",
+        "Coal shortages and emissions targets forced rolling industrial "
+        "power cuts; energy-hungry aluminium and magnesium output fell, "
+        "and Europe's carmakers discovered China smelts most of the "
+        "world's magnesium.",
+        "Power rationing in the world's factory is an export ban nobody "
+        "announced — the shortage arrives basket by basket downstream.",
+        ("coal", "aluminium"),
+    ),
 )
 
 BY_KEY: dict[str, CrisisEvent] = {e.key: e for e in EVENTS}
