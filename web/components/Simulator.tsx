@@ -42,12 +42,36 @@ interface Port {
 
 type Mode = "chokepoint" | "port";
 
+/**
+ * The straits on the map but not yet in the model, with the honest reason.
+ * Assigning trade flows to a strait from memory produces confidently wrong
+ * data — it happened twice before the rule existed — so each of these waits
+ * for deliberate curation. Several are structurally negligible and say so.
+ */
+const UNCURATED_REASONS: Record<string, string> = {
+  "Cape of Good Hope": "This is the bypass route itself — it appears as attenuation on Suez and Bab el-Mandeb.",
+  "Lombok Strait": "Primary bypass for Malacca; its closure is already Malacca's attenuation.",
+  "Sunda Strait": "Primary bypass for Malacca; its closure is already Malacca's attenuation.",
+  "Makassar Strait": "Parallel Indonesian passage; traffic diverts to adjacent straits.",
+  "Luzon Strait": "Eastern bypass of the Taiwan Strait; through-traffic reroutes here.",
+  "Magellan Strait": "Redundant with Panama and the Drake Passage for modern tonnage.",
+  "Bering Strait": "Negligible commercial transit today.",
+  "Tsugaru Strait": "Parallel Japanese passage with ready alternatives.",
+  "Korea Strait": "Flows cannot be defensibly separated from adjacent routes in country-level data.",
+  "Dover Strait": "Ships route north of the UK at trivial cost; closure is a nuisance, not a shock.",
+  "Oresund Strait": "The Great Belt carries the deep-draft Baltic traffic; Oresund alone has a ready bypass.",
+  "Kerch Strait": "Azov flows are a small, port-level slice of Black Sea trade — needs port-share modelling.",
+  "Bohai Strait": "A Chinese import gateway; inbound flows cannot be attributed at country level.",
+};
+const DEFAULT_UNCURATED = "Routing not yet curated — flows must be assigned deliberately, not guessed.";
+
 export default function Simulator() {
   const [mode, setMode] = useState<Mode>("chokepoint");
 
   // chokepoint mode
   const [chokepoints, setChokepoints] = useState<ChokepointMeta[]>([]);
   const [selected, setSelected] = useState<string>("");
+  const [allStraits, setAllStraits] = useState<string[]>([]);
   // port mode
   const [portsByCountry, setPortsByCountry] = useState<Record<string, Port[]>>({});
   const [countryNames, setCountryNames] = useState<Record<string, string>>({});
@@ -72,6 +96,14 @@ export default function Simulator() {
         if (meta.chokepoints?.length) setSelected(meta.chokepoints[0].key);
       })
       .catch(() => setError("engine unavailable"));
+    fetch("/layers/chokepoints.geo.json")
+      .then((r) => r.json())
+      .then((d) =>
+        setAllStraits(
+          d.features.map((f: { properties: { name: string } }) => f.properties.name),
+        ),
+      )
+      .catch(() => {});
     fetch("/layers/ports-by-country.json")
       .then((r) => r.json())
       .then((d) => setPortsByCountry(d))
@@ -241,9 +273,32 @@ export default function Simulator() {
                 className="w-full rounded-md px-3 py-2 text-sm"
                 style={selectStyle}
               >
-                {chokepoints.map((c) => (
-                  <option key={c.key} value={c.key}>{c.label}</option>
-                ))}
+                <optgroup label={`Modelled (${chokepoints.length})`}>
+                  {chokepoints.map((c) => (
+                    <option key={c.key} value={c.key}>{c.label}</option>
+                  ))}
+                </optgroup>
+                {allStraits.filter(
+                  (name) => !chokepoints.some((c) => c.label === name || name.includes(c.label)),
+                ).length > 0 && (
+                  <optgroup label="On the map, awaiting curation">
+                    {allStraits
+                      .filter(
+                        (name) =>
+                          !chokepoints.some(
+                            (c) =>
+                              c.label === name ||
+                              name.replace("Strait of ", "").includes(c.label.replace("Strait of ", "")) ||
+                              c.label.replace("Strait of ", "").includes(name.replace("Strait of ", "")),
+                          ),
+                      )
+                      .map((name) => (
+                        <option key={name} disabled title={UNCURATED_REASONS[name] ?? DEFAULT_UNCURATED}>
+                          {name} — {(UNCURATED_REASONS[name] ?? DEFAULT_UNCURATED).split("—")[0].split(";")[0].slice(0, 46)}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
               </select>
             </label>
           ) : (

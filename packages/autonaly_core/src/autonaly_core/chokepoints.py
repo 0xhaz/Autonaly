@@ -180,6 +180,47 @@ CHOKEPOINTS: tuple[Chokepoint, ...] = (
         ),
     ),
     Chokepoint(
+        key="panama",
+        lat=9.12,
+        lon=-79.77,
+        portwatch_name="Panama Canal",
+        label="Panama Canal",
+        # US Gulf agriculture and gas to East Asia — the flows that genuinely
+        # depend on the canal. Wheat is deliberately excluded: US wheat to Asia
+        # ships predominantly from the Pacific Northwest and never sees Panama.
+        source_countries=("USA",),
+        baskets=("maize", "soybeans", "lng", "lpg"),
+        reroute=Reroute.LONGER_ROUTE,
+        importer_filter=(
+            "CHN", "JPN", "KOR", "TWN", "PHL", "VNM", "THA", "IDN", "MYS", "SGP",
+        ),
+        note=(
+            "US Gulf grain and LNG bound for Asia. Pacific-Northwest loading and "
+            "the Cape/Suez routes are real alternatives, so a closure is a cost "
+            "shock — the 2023-24 drought restrictions played out exactly this way."
+        ),
+    ),
+    Chokepoint(
+        key="taiwan_strait",
+        lat=24.72,
+        lon=119.83,
+        portwatch_name="Taiwan Strait",
+        label="Taiwan Strait",
+        # Modelled as a blockade of Taiwan's own trade — the scenario that
+        # matters — not as mere transit interdiction, which ships bypass east of
+        # the island at trivial cost. For the island's ports there is no bypass.
+        source_countries=("TWN",),
+        baskets=("semiconductors",),
+        reroute=Reroute.NONE,
+        importer_filter=None,
+        note=(
+            "Modelled as a blockade of Taiwan's trade rather than transit "
+            "interdiction (through-traffic diverts east of the island cheaply). "
+            "Taiwan ships roughly a quarter of world semiconductor exports; its "
+            "ports have no alternative."
+        ),
+    ),
+    Chokepoint(
         key="bab_el_mandeb",
         lat=12.79,
         lon=43.35,

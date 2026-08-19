@@ -154,6 +154,50 @@ class TestSourcesAreNotTheirOwnVictims:
         assert not countries & {"CHN", "IND", "SAU", "ARE"}
 
 
+class TestPanama:
+    """US Gulf agriculture and gas to Asia, with real alternatives."""
+
+    def test_asia_only(self, client):
+        result = _chokepoint(
+            client, chokepoint="panama", transit_reduction=1.0, duration_months=6, top_n=200
+        )
+        countries = {a["country"] for a in result["affected"]}
+        assert countries & {"CHN", "JPN", "KOR", "IDN"}
+        assert "DEU" not in countries  # Europe is not served by the canal route
+        assert "USA" not in countries  # the source is never its own victim
+
+    def test_bypass_attenuates(self, client):
+        result = _chokepoint(
+            client, chokepoint="panama", transit_reduction=1.0, duration_months=6
+        )
+        # PNW loading and Cape/Suez alternatives exist; a full closure must not
+        # read like a cutoff.
+        assert result["affected"][0]["score"] < 30
+
+
+class TestTaiwanStrait:
+    """Modelled as a blockade of Taiwan's trade — no bypass for the island."""
+
+    def test_china_carries_the_largest_absolute_exposure(self, client):
+        result = _chokepoint(
+            client, chokepoint="taiwan_strait", transit_reduction=1.0, duration_months=6
+        )
+        assert result["largest_absolute_exposure"] == "CHN"
+
+    def test_chip_importers_dominate(self, client):
+        result = _chokepoint(
+            client, chokepoint="taiwan_strait", transit_reduction=1.0, duration_months=6, top_n=10
+        )
+        top = {a["country"] for a in result["affected"]}
+        assert len(top & {"JPN", "SGP", "KOR", "CHN", "THA"}) >= 4
+
+    def test_taiwan_is_not_its_own_victim(self, client):
+        result = _chokepoint(
+            client, chokepoint="taiwan_strait", transit_reduction=1.0, duration_months=6, top_n=200
+        )
+        assert "TWN" not in {a["country"] for a in result["affected"]}
+
+
 class TestRelativeMaterialityFloor:
     """A flat floor cannot serve baskets spanning three orders of magnitude."""
 

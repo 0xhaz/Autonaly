@@ -344,7 +344,7 @@ export default function CountryDrawer({
 
             {transits.length === 0 && ports.length > 0 && (
               <p className="text-[11px]" style={{ color: "var(--muted)" }}>
-                No modelled chokepoint sits on this country&apos;s routes. Six are
+                No modelled chokepoint sits on this country&apos;s routes. Eight are
                 modelled so far; all 28 are on the map under Chokepoints.
               </p>
             )}
