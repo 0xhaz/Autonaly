@@ -4,7 +4,7 @@ import { Show, SignInButton } from "@clerk/nextjs";
 import { useEffect, useMemo, useState } from "react";
 
 import BriefingWorkspace from "@/components/BriefingWorkspace";
-import type { Rankings } from "@/lib/types";
+import { formatKusd, type Rankings } from "@/lib/types";
 
 /**
  * Stress-test the network before the news does.
@@ -40,7 +40,40 @@ interface Port {
   import_share: number;
 }
 
-type Mode = "chokepoint" | "port";
+type Mode = "chokepoint" | "port" | "conflict";
+
+interface ConflictChannel {
+  key: string;
+  label: string;
+  transmission: string;
+  note: string;
+  sources: string[];
+  coalition_only: boolean;
+  effective_reduction: number;
+  blocked_products: { basket: string; label: string; source_world_share: number }[];
+  rankings: Rankings;
+}
+
+interface ConflictResult {
+  conflict: string;
+  label: string;
+  note: string;
+  omissions: string;
+  intensity: number;
+  channels: ConflictChannel[];
+  combined: {
+    country: string;
+    total_value_at_risk_kusd: number;
+    channels: { channel: string }[];
+  }[];
+}
+
+interface ConflictMeta {
+  key: string;
+  label: string;
+  note: string;
+  channels: { key: string; label: string }[];
+}
 
 /**
  * The straits on the map but not yet in the model, with the honest reason.
@@ -72,6 +105,10 @@ export default function Simulator() {
   const [chokepoints, setChokepoints] = useState<ChokepointMeta[]>([]);
   const [selected, setSelected] = useState<string>("");
   const [allStraits, setAllStraits] = useState<string[]>([]);
+  const [conflicts, setConflicts] = useState<ConflictMeta[]>([]);
+  const [conflictKey, setConflictKey] = useState<string>("");
+  const [conflictResult, setConflictResult] = useState<ConflictResult | null>(null);
+  const [channelKey, setChannelKey] = useState<string>("");
   // port mode
   const [portsByCountry, setPortsByCountry] = useState<Record<string, Port[]>>({});
   const [countryNames, setCountryNames] = useState<Record<string, string>>({});
@@ -94,6 +131,8 @@ export default function Simulator() {
       .then((meta) => {
         setChokepoints(meta.chokepoints ?? []);
         if (meta.chokepoints?.length) setSelected(meta.chokepoints[0].key);
+        setConflicts(meta.conflicts ?? []);
+        if (meta.conflicts?.length) setConflictKey(meta.conflicts[0].key);
       })
       .catch(() => setError("engine unavailable"));
     fetch("/layers/chokepoints.geo.json")
@@ -119,6 +158,8 @@ export default function Simulator() {
   }, []);
 
   const current = chokepoints.find((c) => c.key === selected);
+  const currentConflict = conflicts.find((c) => c.key === conflictKey);
+  const currentChannel = conflictResult?.channels.find((c) => c.key === channelKey);
   const countryOptions = useMemo(
     () =>
       Object.keys(portsByCountry)
@@ -137,6 +178,7 @@ export default function Simulator() {
   const reset = () => {
     setRankings(null);
     setAssumption(null);
+    setConflictResult(null);
     setBrief(null);
     setBriefError(null);
   };
@@ -146,6 +188,28 @@ export default function Simulator() {
     setError(null);
     setBrief(null);
     setBriefError(null);
+
+    if (mode === "conflict") {
+      const response = await fetch("/api/simulate-conflict", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          conflict: conflictKey,
+          intensity: reduction / 100,
+          duration_months: months,
+        }),
+      });
+      setRunning(false);
+      if (!response.ok) {
+        setError("simulation failed");
+        return;
+      }
+      const data: ConflictResult = await response.json();
+      setConflictResult(data);
+      setChannelKey(data.channels[0]?.key ?? "");
+      setRankings(null);
+      return;
+    }
 
     const [url, body] =
       mode === "chokepoint"
@@ -183,6 +247,38 @@ export default function Simulator() {
   };
 
   const askDesk = async () => {
+    if (mode === "conflict" && conflictResult) {
+      setBriefing(true);
+      setBriefError(null);
+      const response = await fetch("/api/scenario-brief", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenario: {
+            type: "conflict",
+            label: conflictResult.label,
+            intensity: conflictResult.intensity,
+            duration_months: months,
+            channels: conflictResult.channels.map((c) => ({
+              label: c.label,
+              transmission: c.transmission,
+              effective_reduction: c.effective_reduction,
+              coalition_only: c.coalition_only,
+            })),
+            omissions: conflictResult.omissions,
+          },
+          rankings: conflictResult,
+        }),
+      });
+      setBriefing(false);
+      if (!response.ok) {
+        setBriefError("The desk could not complete this brief.");
+        return;
+      }
+      const data = await response.json();
+      setBrief(data.narrative);
+      return;
+    }
     if (!rankings) return;
     setBriefing(true);
     setBriefError(null);
@@ -222,7 +318,9 @@ export default function Simulator() {
   };
 
   const marker =
-    mode === "chokepoint" && current
+    mode === "conflict"
+      ? null
+      : mode === "chokepoint" && current
       ? { lat: current.lat, lon: current.lon, label: current.label }
       : currentPort?.lat != null && currentPort?.lon != null
         ? { lat: currentPort.lat, lon: currentPort.lon, label: `Port of ${currentPort.name}` }
@@ -234,11 +332,85 @@ export default function Simulator() {
     color: "var(--text)",
   } as const;
 
+  // The desk's-read panel is identical across chokepoint, port, and conflict
+  // results — one definition, rendered wherever a result exists.
+  const deskPanel = (
+        <section className="panel p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">The desk&apos;s read</h2>
+              <p className="mt-0.5 text-xs" style={{ color: "var(--muted)" }}>
+                The analyst writes a brief for your hypothetical — same provenance
+                guard as a real event, clearly labelled as one that never happened.
+              </p>
+            </div>
+            <Show when="signed-in">
+              {!brief && (
+                <button
+                  type="button"
+                  onClick={askDesk}
+                  disabled={briefing}
+                  className="rounded-md px-4 py-2 text-sm font-semibold"
+                  style={{ background: "var(--accent)", color: "#04121f", opacity: briefing ? 0.6 : 1 }}
+                >
+                  {briefing ? "The desk is reading…" : "Ask the desk about this scenario"}
+                </button>
+              )}
+            </Show>
+            <Show when="signed-out">
+              <SignInButton mode="modal">
+                <button
+                  type="button"
+                  className="rounded-md px-4 py-2 text-sm font-medium"
+                  style={{ border: "1px solid var(--line)", color: "var(--muted)" }}
+                >
+                  Sign in to ask the desk
+                </button>
+              </SignInButton>
+            </Show>
+          </div>
+
+          {briefError && <p className="mt-3 text-sm" style={{ color: "var(--danger)" }}>{briefError}</p>}
+
+          {brief && (
+            <div className="mt-4 rounded-md p-4" style={{ background: "var(--panel-2)", border: "1px solid var(--line)" }}>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="chip" style={{ color: "#e8a33d", borderColor: "color-mix(in srgb, #e8a33d 40%, transparent)" }}>
+                  hypothetical
+                </span>
+                <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+                  every figure engine-verified
+                </span>
+              </div>
+              <div className="narrative">
+                {brief.split("\n").map((line, i) => {
+                  const t = line.trim();
+                  if (!t) return null;
+                  const m = t.match(/^\*\*(.+?)\*\*\s*(.*)$/);
+                  if (m) {
+                    return (
+                      <p key={i} className="mt-2 text-sm" style={{ color: "#cdd9e8" }}>
+                        <strong style={{ color: "var(--text)" }}>{m[1]}</strong> {m[2]}
+                      </p>
+                    );
+                  }
+                  return (
+                    <p key={i} className="mt-1.5 text-sm" style={{ color: "#cdd9e8" }}>
+                      {t.replace(/\*\*/g, "")}
+                    </p>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+  );
+
   return (
     <div className="space-y-5">
       <section className="panel space-y-4 p-4">
         <div className="flex gap-1 rounded-md p-0.5" style={{ background: "var(--panel-2)", width: "fit-content" }}>
-          {(["chokepoint", "port"] as const).map((m) => (
+          {(["chokepoint", "port", "conflict"] as const).map((m) => (
             <button
               key={m}
               type="button"
@@ -253,7 +425,7 @@ export default function Simulator() {
                 border: mode === m ? "1px solid var(--line)" : "1px solid transparent",
               }}
             >
-              {m === "chokepoint" ? "Chokepoint" : "Port blockage"}
+              {m === "chokepoint" ? "Chokepoint" : m === "port" ? "Port blockage" : "Conflict"}
             </button>
           ))}
         </div>
@@ -301,7 +473,7 @@ export default function Simulator() {
                 )}
               </select>
             </label>
-          ) : (
+          ) : mode === "port" ? (
             <label className="space-y-1.5">
               <span className="block text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
                 Country · port
@@ -337,11 +509,30 @@ export default function Simulator() {
                 </select>
               </div>
             </label>
+          ) : (
+            <label className="space-y-1.5">
+              <span className="block text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+                Conflict scenario
+              </span>
+              <select
+                value={conflictKey}
+                onChange={(e) => {
+                  setConflictKey(e.target.value);
+                  reset();
+                }}
+                className="w-full rounded-md px-3 py-2 text-sm"
+                style={selectStyle}
+              >
+                {conflicts.map((c) => (
+                  <option key={c.key} value={c.key}>{c.label}</option>
+                ))}
+              </select>
+            </label>
           )}
 
           <label className="space-y-1.5">
             <span className="block text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
-              {mode === "chokepoint" ? "Transit reduction" : "Share of port lost"} ·{" "}
+              {mode === "chokepoint" ? "Transit reduction" : mode === "port" ? "Share of port lost" : "Conflict intensity"} ·{" "}
               <span className="mono">{reduction}%</span>
             </span>
             <input
@@ -367,7 +558,7 @@ export default function Simulator() {
           <button
             type="button"
             onClick={run}
-            disabled={running || (mode === "chokepoint" ? !selected : !currentPort)}
+            disabled={running || (mode === "chokepoint" ? !selected : mode === "port" ? !currentPort : !conflictKey)}
             className="self-end rounded-md px-5 py-2 text-sm font-semibold"
             style={{ background: "var(--accent)", color: "#04121f", opacity: running ? 0.6 : 1 }}
           >
@@ -396,6 +587,14 @@ export default function Simulator() {
             ports concentrate risk.
           </p>
         )}
+        {mode === "conflict" && currentConflict && (
+          <p className="rounded-md p-2.5 text-xs" style={{ background: "var(--panel-2)", color: "var(--muted)" }}>
+            {currentConflict.note} A conflict is not one shock but several with
+            different reach: physical destruction cuts exports to every buyer,
+            while sanctions bind only the coalition imposing them. Intensity
+            scales all channels together.
+          </p>
+        )}
       </section>
 
       {error && <p className="text-sm" style={{ color: "var(--danger)" }}>{error}</p>}
@@ -408,75 +607,7 @@ export default function Simulator() {
             {assumption ? ` · ${assumption}` : ""}
           </p>
 
-          <section className="panel p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold">The desk&apos;s read</h2>
-                <p className="mt-0.5 text-xs" style={{ color: "var(--muted)" }}>
-                  The analyst writes a brief for your hypothetical — same provenance
-                  guard as a real event, clearly labelled as one that never happened.
-                </p>
-              </div>
-              <Show when="signed-in">
-                {!brief && (
-                  <button
-                    type="button"
-                    onClick={askDesk}
-                    disabled={briefing}
-                    className="rounded-md px-4 py-2 text-sm font-semibold"
-                    style={{ background: "var(--accent)", color: "#04121f", opacity: briefing ? 0.6 : 1 }}
-                  >
-                    {briefing ? "The desk is reading…" : "Ask the desk about this scenario"}
-                  </button>
-                )}
-              </Show>
-              <Show when="signed-out">
-                <SignInButton mode="modal">
-                  <button
-                    type="button"
-                    className="rounded-md px-4 py-2 text-sm font-medium"
-                    style={{ border: "1px solid var(--line)", color: "var(--muted)" }}
-                  >
-                    Sign in to ask the desk
-                  </button>
-                </SignInButton>
-              </Show>
-            </div>
-
-            {briefError && <p className="mt-3 text-sm" style={{ color: "var(--danger)" }}>{briefError}</p>}
-
-            {brief && (
-              <div className="mt-4 rounded-md p-4" style={{ background: "var(--panel-2)", border: "1px solid var(--line)" }}>
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="chip" style={{ color: "#e8a33d", borderColor: "color-mix(in srgb, #e8a33d 40%, transparent)" }}>
-                    hypothetical
-                  </span>
-                  <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
-                    every figure engine-verified
-                  </span>
-                </div>
-                <div className="narrative">
-                  {brief.split("\n").map((line, i) => {
-                    const t = line.trim();
-                    if (!t) return null;
-                    const m = t.match(/^\*\*(.+?)\*\*\s*(.*)$/);
-                    if (m) {
-                      return (
-                        <p key={i} className="mt-2 text-sm" style={{ color: "#cdd9e8" }}>
-                          <strong style={{ color: "var(--text)" }}>{m[1]}</strong> {m[2]}
-                        </p>
-                      );
-                    }
-                    return (
-                      <p key={i} className="mt-1.5 text-sm" style={{ color: "#cdd9e8" }}>
-                        {t.replace(/\*\*/g, "")}
-                      </p>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </section>
+          {deskPanel}
 
           <BriefingWorkspace
             key={`${mode}-${rankings.event_key}-${reduction}-${months}-${portName}`}
@@ -484,6 +615,137 @@ export default function Simulator() {
             sources={rankings.sources ?? []}
             marker={marker}
           />
+        </>
+      )}
+
+      {conflictResult && (
+        <>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>
+            Hypothetical conflict scenario · {conflictResult.label} · every channel
+            computed by the same deterministic engine that scores real events · no
+            model involved
+          </p>
+
+          <p className="rounded-md p-3 text-xs" style={{ background: "var(--panel)", border: "1px solid var(--line)", color: "var(--muted)" }}>
+            <span style={{ color: "#e8a33d" }}>Read the numbers as marginal risk on
+            today&apos;s network:</span>{" "}
+            the 2024 trade weights already embed the rewiring the real war forced —
+            Europe&apos;s pivot away from Russian seaborne energy is priced in, which
+            is why Germany ranks small and pipeline-locked Slovakia and Hungary rank
+            large. Not modelled: {conflictResult.omissions}
+          </p>
+
+          {deskPanel}
+
+          <section className="panel overflow-hidden">
+            <div className="border-b p-4" style={{ borderColor: "var(--line)" }}>
+              <h2 className="text-sm font-semibold">Combined exposure across all channels</h2>
+              <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+                Dollars at risk summed over every channel that reaches each country.
+              </p>
+            </div>
+            <div className="overflow-x-auto p-2">
+              <table className="rank">
+                <thead>
+                  <tr>
+                    <th>Country</th>
+                    <th>Total value at risk</th>
+                    <th>Hit through</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {conflictResult.combined.slice(0, 12).map((row) => (
+                    <tr key={row.country}>
+                      <td className="font-medium">
+                        {countryNames[row.country] ?? row.country}{" "}
+                        <span className="mono text-[11px]" style={{ color: "var(--muted)" }}>
+                          {row.country}
+                        </span>
+                      </td>
+                      <td className="mono">{formatKusd(row.total_value_at_risk_kusd)}</td>
+                      <td>
+                        <span className="flex flex-wrap justify-end gap-1">
+                          {row.channels.map((c) => (
+                            <span key={c.channel} className="chip chip-computed" style={{ textTransform: "none" }}>
+                              {conflictResult.channels.find((ch) => ch.key === c.channel)?.label ?? c.channel}
+                            </span>
+                          ))}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="panel p-4">
+            <h2 className="text-sm font-semibold">Blocked and restricted exports</h2>
+            <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+              What stops moving, by channel — with each product&apos;s share of world
+              trade supplied by the disrupted countries.
+            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              {conflictResult.channels.map((ch) => (
+                <div key={ch.key} className="rounded-md p-3" style={{ background: "var(--panel-2)", border: "1px solid var(--line)" }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold">{ch.label}</span>
+                    <span className="mono text-[11px]" style={{ color: "#e8a33d" }}>
+                      −{Math.round(ch.effective_reduction * 100)}%
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                    {ch.transmission}
+                    {ch.coalition_only ? " · binds coalition importers only" : " · hits every importer"}
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {ch.blocked_products.map((bp) => (
+                      <li key={bp.basket} className="flex items-baseline justify-between gap-2 text-xs">
+                        <span>{bp.label}</span>
+                        <span className="mono" style={{ color: "var(--muted)" }}>
+                          {(bp.source_world_share * 100).toFixed(1)}% of world
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+              Inspect channel
+            </span>
+            {conflictResult.channels.map((ch) => (
+              <button
+                key={ch.key}
+                type="button"
+                onClick={() => setChannelKey(ch.key)}
+                className="rounded-md px-3 py-1.5 text-xs font-medium"
+                style={{
+                  background: channelKey === ch.key ? "var(--panel)" : "transparent",
+                  color: channelKey === ch.key ? "var(--text)" : "var(--muted)",
+                  border: channelKey === ch.key ? "1px solid var(--accent)" : "1px solid var(--line)",
+                }}
+              >
+                {ch.label}
+              </button>
+            ))}
+          </div>
+
+          {currentChannel && (
+            <>
+              <p className="text-xs" style={{ color: "var(--muted)" }}>
+                {currentChannel.note}
+              </p>
+              <BriefingWorkspace
+                key={`conflict-${conflictKey}-${channelKey}-${reduction}-${months}`}
+                rankings={currentChannel.rankings}
+                sources={currentChannel.sources}
+              />
+            </>
+          )}
         </>
       )}
     </div>

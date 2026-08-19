@@ -6,9 +6,10 @@ const ENGINE = process.env.AUTONALY_ENGINE_URL ?? "http://localhost:8080";
 
 export async function GET() {
   try {
-    const [baskets, chokepoints] = await Promise.all([
+    const [baskets, chokepoints, conflicts] = await Promise.all([
       fetch(`${ENGINE}/baskets`, { cache: "no-store" }).then((r) => r.json()),
       fetch(`${ENGINE}/chokepoints`, { cache: "no-store" }).then((r) => r.json()),
+      fetch(`${ENGINE}/conflicts`, { cache: "no-store" }).then((r) => r.json()),
     ]);
     return NextResponse.json({
       baskets: baskets.baskets.map((b: { key: string; label: string; essentiality: string }) => ({
@@ -35,6 +36,7 @@ export async function GET() {
           lon: c.lon,
         }),
       ),
+      conflicts: conflicts.conflicts,
     });
   } catch {
     return NextResponse.json({ error: "engine unavailable" }, { status: 503 });

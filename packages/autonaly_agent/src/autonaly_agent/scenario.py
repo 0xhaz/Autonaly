@@ -38,8 +38,11 @@ ABSOLUTE RULES:
 
 Write exactly these sections:
 
-**The premise** — one sentence: what is disrupted (a strait or a port), the
-effective reduction, the duration, and what can divert. If a bypass or
+**The premise** — one sentence: what is disrupted (a strait, a port, or a
+multi-channel conflict), the effective reduction, the duration, and what can
+divert. For a conflict: name the channels and their distinct mechanics —
+physical collapse hits every buyer, sanctions hit only the coalition imposing
+them. If a bypass or
 diversion exists, say the scores are attenuated for it and why that matters.
 For a port: the reduction is the port's share of the country's maritime
 exports times the share of the port lost — say so.

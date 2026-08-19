@@ -378,6 +378,167 @@ def country_profile(
     }
 
 
+@app.get("/conflicts")
+def list_conflicts() -> dict:
+    from autonaly_core.conflicts import CONFLICTS
+
+    return {
+        "conflicts": [
+            {
+                "key": c.key,
+                "label": c.label,
+                "note": c.note,
+                "omissions": c.omissions,
+                "channels": [
+                    {
+                        "key": ch.key,
+                        "label": ch.label,
+                        "transmission": ch.transmission,
+                        "sources": list(ch.sources),
+                        "baskets": list(ch.baskets),
+                        "default_reduction": ch.default_reduction,
+                        "coalition_only": ch.importer_filter is not None,
+                    }
+                    for ch in c.channels
+                ],
+            }
+            for c in CONFLICTS
+        ]
+    }
+
+
+class ConflictRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    conflict: str
+    intensity: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=1.0,
+        description="Scales every channel's default reduction",
+    )
+    duration_months: int = Field(default=6, ge=0, le=120)
+    top_n: int = Field(default=20, ge=1, le=200)
+    version: str = DEFAULT_VERSION
+    year: int = DEFAULT_YEAR
+
+
+@app.post("/conflict")
+def compute_conflict(request: ConflictRequest) -> dict:
+    """One war, several disruptions: run each channel through the ordinary
+    exposure computation and compose the results.
+
+    The combined table sums value at risk per country across channels — safe
+    because channel baskets are disjoint — while scores stay per-channel: a
+    sanctions score and a blockade score measure different mechanics and
+    averaging them would mean nothing.
+    """
+    from autonaly_core.baskets import BY_KEY as BASKET_KEYS
+    from autonaly_core.conflicts import BY_KEY as CONFLICT_KEYS
+
+    spec = CONFLICT_KEYS.get(request.conflict)
+    if spec is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"unknown conflict {request.conflict!r}; valid: {sorted(CONFLICT_KEYS)}",
+        )
+
+    con, paths = connect(request.version, request.year)
+
+    channels_out = []
+    combined: dict[str, dict] = {}
+    for ch in spec.channels:
+        # Computed over the full ranking (top_n=200): the combined table sums
+        # value at risk per country, and a big-absolute buyer sitting outside a
+        # channel's intensity page must still be counted — Germany's sanctions
+        # exposure is real even when Slovakia's intensity outranks it.
+        rankings = compute_exposure(
+            ExposureRequest(
+                event_key=f"{spec.key}-{ch.key}",
+                sources=list(ch.sources),
+                baskets=list(ch.baskets),
+                severity=SeverityInput(
+                    label=ch.transmission,
+                    transit_reduction=round(ch.default_reduction * request.intensity, 4),
+                    duration_months=request.duration_months,
+                ),
+                top_n=200,
+                importers=list(ch.importer_filter) if ch.importer_filter else None,
+                exclude_importers=list(ch.sources),
+            )
+        )
+
+        # The blocked-products list: what the channel's sources supply the
+        # world in each basket, so 'Ukraine's exports collapse' names wheat at
+        # its world share rather than as an abstraction.
+        products = []
+        for key in ch.baskets:
+            b = BASKET_KEYS[key]
+            shares = supplier_shares(con, paths, b.codes)
+            source_share = sum(shares.get(src, 0.0) for src in ch.sources)
+            world = world_basket_total(con, paths, b.codes)
+            products.append(
+                {
+                    "basket": key,
+                    "label": b.label,
+                    "source_world_share": round(source_share, 4),
+                    "world_trade_kusd": round(world, 1),
+                }
+            )
+        products.sort(key=lambda r: r["source_world_share"], reverse=True)
+
+        channels_out.append(
+            {
+                "key": ch.key,
+                "label": ch.label,
+                "transmission": ch.transmission,
+                "note": ch.note,
+                "sources": list(ch.sources),
+                "coalition_only": ch.importer_filter is not None,
+                "effective_reduction": round(ch.default_reduction * request.intensity, 4),
+                "blocked_products": products,
+                "rankings": {
+                    **rankings.model_dump(mode="json"),
+                    "affected": [
+                        a.model_dump(mode="json") for a in rankings.affected[: request.top_n]
+                    ],
+                },
+            }
+        )
+
+        for row in rankings.affected:
+            entry = combined.setdefault(
+                row.country,
+                {"country": row.country, "total_value_at_risk_kusd": 0.0, "channels": []},
+            )
+            entry["total_value_at_risk_kusd"] += row.value_at_risk_kusd or 0.0
+            entry["channels"].append(
+                {
+                    "channel": ch.key,
+                    "score": row.score,
+                    "value_at_risk_kusd": row.value_at_risk_kusd,
+                }
+            )
+
+    combined_rows = sorted(
+        combined.values(), key=lambda r: r["total_value_at_risk_kusd"], reverse=True
+    )
+    for row in combined_rows:
+        row["total_value_at_risk_kusd"] = round(row["total_value_at_risk_kusd"], 1)
+
+    return {
+        "conflict": spec.key,
+        "label": spec.label,
+        "note": spec.note,
+        "omissions": spec.omissions,
+        "intensity": request.intensity,
+        "duration_months": request.duration_months,
+        "channels": channels_out,
+        "combined": combined_rows[: request.top_n],
+        "methodology_version": METHODOLOGY_VERSION,
+    }
+
+
 @app.get("/chokepoints")
 def list_chokepoints() -> dict[str, list[dict]]:
     """Routing table, so the agent discovers valid chokepoints rather than guessing."""
