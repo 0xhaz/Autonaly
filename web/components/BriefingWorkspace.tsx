@@ -139,6 +139,28 @@ export default function BriefingWorkspace({
         />
       </div>
 
+      {(rankings.winners?.length ?? 0) > 0 && (
+        <section className="panel p-4">
+          <h2 className="text-sm font-semibold">Who benefits</h2>
+          <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+            Substitute exporters with world share and headroom to redirect — a
+            rendering of existing trade data, not a forecast.
+          </p>
+          <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            {rankings.winners!.map((w) => (
+              <li key={w.country} className="flex gap-3 rounded-md p-2.5" style={{ background: "var(--panel-2)" }}>
+                <span className="mono font-semibold" style={{ color: "var(--ok)" }}>
+                  {names[w.country] ?? w.country}
+                </span>
+                <span className="text-xs leading-relaxed" style={{ color: "var(--muted)" }}>
+                  {w.evidence?.[0] ?? w.mechanism}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="panel overflow-hidden">
         <div className="flex items-baseline justify-between border-b p-4" style={{ borderColor: "var(--line)" }}>
           <div>

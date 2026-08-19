@@ -24,8 +24,15 @@ interface RelatedEvent {
   rhyme: string;
 }
 
+interface Outcome {
+  metric: string;
+  move: string;
+  window: string;
+}
+
 interface CrisisReport {
   key: string;
+  outcomes: Outcome[];
   title: string;
   year_start: number;
   year_end: number | null;
@@ -89,6 +96,29 @@ export default function CrisisPage() {
           {report.rhyme}
         </p>
       </section>
+
+      {report.outcomes.length > 0 && (
+        <section className="panel p-5">
+          <h2 className="text-sm font-semibold">What actually repriced</h2>
+          <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+            The documented market response — base rates for the next rhyme, not
+            advice.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {report.outcomes.map((o) => (
+              <li key={o.metric} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
+                <span className="font-medium">{o.metric}</span>
+                <span className="text-xs" style={{ color: "#cdd9e8" }}>
+                  {o.move}
+                </span>
+                <span className="mono shrink-0 text-[11px]" style={{ color: "var(--muted)" }}>
+                  {o.window}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {report.commodities_today.length > 0 && (
         <section className="panel p-5">

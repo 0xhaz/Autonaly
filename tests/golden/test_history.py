@@ -38,6 +38,21 @@ class TestDatasetIntegrity:
             assert e.countries, e.key
             assert all(len(c) == 3 and c.isupper() for c in e.countries), e.key
 
+    def test_outcomes_are_complete_where_present(self):
+        # D32: what actually repriced. Curated for the well-documented majors;
+        # every outcome must carry metric, move and window.
+        with_outcomes = [e for e in EVENTS if e.outcomes]
+        assert len(with_outcomes) >= 15
+        for e in with_outcomes:
+            for o in e.outcomes:
+                assert o.metric and o.move and o.window, e.key
+
+    def test_the_archetypes_carry_outcomes(self):
+        from autonaly_core.history import BY_KEY
+
+        for key in ("opec-embargo", "russia-ukraine-war", "thai-floods", "covid"):
+            assert BY_KEY[key].outcomes, key
+
     def test_every_event_teaches_something(self):
         # The rhyme is the point of the dataset; an event without one is a
         # trivia entry, not a reference.

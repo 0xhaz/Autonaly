@@ -102,7 +102,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           style={{ color: "var(--muted)" }}
         >
           Data: BACI/CEPII (Etalab 2.0) · UN Global Platform; IMF PortWatch. Exposure
-          figures use latest-year trade weights and model first-order effects only.
+          figures use latest-year trade weights and model first-order effects only ·{" "}
+          <Link href="/methodology" style={{ color: "var(--accent)" }}>
+            methodology
+          </Link>
         </footer>
         </ClerkProvider>
       </body>

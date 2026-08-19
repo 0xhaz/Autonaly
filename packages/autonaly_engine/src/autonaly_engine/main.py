@@ -394,6 +394,9 @@ def _event_row(e) -> dict:  # noqa: ANN001 - CrisisEvent
         "rhyme": e.rhyme,
         "baskets": list(e.baskets),
         "chokepoints": list(e.chokepoints),
+        "outcomes": [
+            {"metric": o.metric, "move": o.move, "window": o.window} for o in e.outcomes
+        ],
     }
 
 

@@ -9,6 +9,7 @@ dependencies = [
     "autonaly-engine",
     "autonaly-agent",
     "autonaly-ingest",
+    "autonaly-mcp",
     "babel>=2.18.0",
 ]
 
@@ -30,6 +31,7 @@ autonaly-pipeline = { workspace = true }
 autonaly-engine = { workspace = true }
 autonaly-agent = { workspace = true }
 autonaly-ingest = { workspace = true }
+autonaly-mcp = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

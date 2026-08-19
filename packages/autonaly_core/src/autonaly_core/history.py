@@ -38,6 +38,19 @@ CATEGORIES = (
 
 
 @dataclass(frozen=True)
+class Outcome:
+    """What actually repriced (architecture D32) — a base rate, not advice.
+
+    Curated magnitudes from the well-documented record, hedged where the
+    record is approximate. These are the numbers an analyst reaches for when
+    asked "and what did that do to prices last time"."""
+
+    metric: str
+    move: str
+    window: str
+
+
+@dataclass(frozen=True)
 class CrisisEvent:
     key: str
     title: str
@@ -49,6 +62,7 @@ class CrisisEvent:
     rhyme: str
     baskets: tuple[str, ...] = field(default=())
     chokepoints: tuple[str, ...] = field(default=())
+    outcomes: tuple[Outcome, ...] = field(default=())
 
 
 EVENTS: tuple[CrisisEvent, ...] = (
@@ -211,6 +225,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "Opaque state buying moves grain markets as violently as export "
         "bans — watch the importer's silence, not just the exporter's.",
         ("wheat", "maize"),
+        outcomes=(
+            Outcome("US wheat", "roughly tripled", "mid-1972 – early 1974"),
+        ),
     ),
     CrisisEvent(
         "opec-embargo", "OPEC oil embargo", 1973, 1974,
@@ -222,6 +239,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "its legacy is the buyer's strategic reserves built to blunt the "
         "next one.",
         ("crude_oil", "refined_products"), ("hormuz",),
+        outcomes=(
+            Outcome("Crude oil (posted price)", "roughly quadrupled, ~$3 to ~$12 per barrel", "Oct 1973 – Jan 1974"),
+        ),
     ),
     CrisisEvent(
         "lebanon-civil-war", "Lebanese civil war", 1975, 1990,
@@ -242,6 +262,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "actually lost — revolution in an exporter moves prices beyond its "
         "own volumes.",
         ("crude_oil",), ("hormuz",),
+        outcomes=(
+            Outcome("Crude oil", "more than doubled, ~$13 to over $30 per barrel", "1979 – mid-1980"),
+        ),
     ),
     CrisisEvent(
         "us-grain-embargo", "US grain embargo on the USSR", 1980, 1981,
@@ -301,6 +324,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "The market's answer to a double supply loss is spare capacity; the "
         "question for the next crisis is who holds it.",
         ("crude_oil",), ("hormuz",),
+        outcomes=(
+            Outcome("Brent crude", "roughly doubled, ~$17 to ~$36 per barrel", "Aug – Oct 1990"),
+        ),
     ),
     CrisisEvent(
         "ussr-collapse", "Collapse of the Soviet Union", 1991, 1994,
@@ -435,6 +461,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "Export bans are contagious: each one raises the price that "
         "justifies the next. The cascade, not the harvest, makes the crisis.",
         ("rice", "wheat"),
+        outcomes=(
+            Outcome("Rice", "roughly tripled in about six months", "late 2007 – mid 2008"),
+        ),
     ),
     CrisisEvent(
         "georgia-war", "Russo-Georgian War", 2008, 2008,
@@ -464,6 +493,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "An exporter's domestic drought becomes an importer's political "
         "crisis — grain price shocks land hardest where bread is politics.",
         ("wheat", "barley"),
+        outcomes=(
+            Outcome("Wheat futures", "up on the order of 60–80%", "Jun – Aug 2010"),
+        ),
     ),
     CrisisEvent(
         "china-rare-earths", "China's rare-earth restrictions", 2010, 2014,
@@ -474,6 +506,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "A monopoly squeeze on a niche input works once: the price spike "
         "finances the mines that end the monopoly.",
         ("rare_earths", "rare_earth_magnets"),
+        outcomes=(
+            Outcome("Rare-earth oxide prices", "multiplied severalfold — some oxides more than tenfold — then collapsed as new supply arrived", "2010 – 2013"),
+        ),
     ),
     CrisisEvent(
         "eyjafjallajokull", "Eyjafjallajökull ash cloud", 2010, 2010,
@@ -503,6 +538,10 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "Tier-two suppliers are the hidden chokepoints: the world learns "
         "what one factory made only when it stops.",
         ("semiconductors", "lng"),
+        outcomes=(
+            Outcome("Japanese auto output", "fell by around half at the trough as single-source parts ran out", "Apr – Jun 2011"),
+            Outcome("Japanese LNG imports", "rose sharply for years as the nuclear fleet shut down", "2011 – 2014"),
+        ),
     ),
     CrisisEvent(
         "thai-floods", "Thailand floods and the hard-drive shortage", 2011, 2012,
@@ -513,6 +552,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "Industrial clustering converts a local flood into a global "
         "electronics shortage — geography of factories is destiny.",
         ("semiconductors",),
+        outcomes=(
+            Outcome("Hard-drive prices", "roughly doubled, staying elevated for about a year", "Q4 2011 – 2012"),
+        ),
     ),
     CrisisEvent(
         "libya-war", "Libyan civil war", 2011, None,
@@ -616,6 +658,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "A precision strike can remove more supply in an hour than a year "
         "of war — and modern repair speed is the underrated stabilizer.",
         ("crude_oil",), ("hormuz",),
+        outcomes=(
+            Outcome("Brent crude", "jumped ~15% on reopen — the largest single-day move since 1991 — and retraced within weeks", "Sep 2019"),
+        ),
     ),
     CrisisEvent(
         "japan-korea-chips", "Japan–Korea semiconductor materials dispute", 2019, 2023,
@@ -648,6 +693,10 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "Pandemic disruption is demand whiplash plus port queues — the "
         "goods exist, the system connecting them loses its rhythm.",
         ("semiconductors",),
+        outcomes=(
+            Outcome("Container spot rates (Drewry WCI)", "rose roughly fivefold to records above $10,000/FEU", "2020 – late 2021"),
+            Outcome("Chip lead times", "stretched beyond 20 weeks at the peak of the shortage", "2021 – 2022"),
+        ),
     ),
     CrisisEvent(
         "indonesia-nickel", "Indonesian nickel ore export ban", 2020, None,
@@ -678,6 +727,10 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "Short chokepoint closures are delay shocks, not supply shocks — "
         "measured transits, not headlines, are the severity.",
         (), ("suez",),
+        outcomes=(
+            Outcome("Suez transit queue", "several hundred ships waiting; schedule disruption rippled for months", "Mar – Jun 2021"),
+            Outcome("Crude oil", "moved a few percent on the headlines and retraced within days", "Mar 2021"),
+        ),
     ),
     CrisisEvent(
         "chip-shortage", "Global chip shortage", 2020, 2023,
@@ -723,6 +776,11 @@ EVENTS: tuple[CrisisEvent, ...] = (
         ("wheat", "maize", "barley", "crude_oil", "refined_products",
          "coal", "potash", "nitrogen_fertilizer", "iron_ore"),
         ("bosporus",),
+        outcomes=(
+            Outcome("Wheat futures", "up roughly 60% to record highs", "Feb – Mar 2022"),
+            Outcome("European gas (TTF)", "peaked near €340/MWh, an order of magnitude above pre-crisis norms", "Aug 2022"),
+            Outcome("Potash and urea", "multi-year highs before retracing as flows rerouted", "2022"),
+        ),
     ),
     CrisisEvent(
         "india-wheat-ban", "Indian wheat export ban", 2022, 2022,
@@ -733,6 +791,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "In a tight market, announced supply is load-bearing: withdrawing a "
         "promise moves prices like losing a harvest.",
         ("wheat",),
+        outcomes=(
+            Outcome("Chicago wheat futures", "limit-up ~6% on the announcement", "May 2022"),
+        ),
     ),
     CrisisEvent(
         "indonesia-palm-ban", "Indonesian palm oil export ban", 2022, 2022,
@@ -764,6 +825,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "Climate can throttle a chokepoint no navy could close — and "
         "rationing by auction decides who reroutes.",
         ("lng", "lpg", "maize", "soybeans"), ("panama",),
+        outcomes=(
+            Outcome("Transit slot auctions", "premiums reached millions of dollars per passage at the squeeze's peak", "late 2023"),
+        ),
     ),
     CrisisEvent(
         "gallium-germanium", "China's gallium and germanium controls", 2023, None,
@@ -787,6 +851,10 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "closing it physically — insurers, not navies, decide when it "
         "reopens.",
         (), ("suez", "bab_el_mandeb"),
+        outcomes=(
+            Outcome("Asia–Europe container spot rates", "roughly tripled", "Dec 2023 – Jan 2024"),
+            Outcome("Suez transits and canal revenue", "fell by about half", "2024"),
+        ),
     ),
     CrisisEvent(
         "baltimore-bridge", "Baltimore bridge collapse", 2024, 2024,
@@ -869,6 +937,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "imposed from within — and the regulatory aftermath outlasts the "
         "repair.",
         ("iron_ore",),
+        outcomes=(
+            Outcome("Iron ore", "rose about 20% in the weeks after Brumadinho", "Jan – Feb 2019"),
+        ),
     ),
     CrisisEvent(
         "aus-china-trade", "China's trade measures against Australia", 2020, 2023,
@@ -1132,6 +1203,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "did — regime change often threatens supply less than markets "
         "price.",
         ("aluminium",),
+        outcomes=(
+            Outcome("Alumina", "rose about 10% within days of the coup before retracing", "Sep 2021"),
+        ),
     ),
     CrisisEvent(
         "mozambique-lng", "Cabo Delgado insurgency and the LNG halt", 2021, 2024,
@@ -1215,6 +1289,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "A river is infrastructure with no backup — when the water level "
         "is the constraint, no investment fixes this season.",
         ("maize", "soybeans"),
+        outcomes=(
+            Outcome("Barge freight (St. Louis)", "spiked to several times the seasonal norm at harvest peak", "Sep – Oct 2022"),
+        ),
     ),
     CrisisEvent(
         "rhine-drought", "Rhine low-water crisis", 2022, 2022,
@@ -1236,6 +1313,9 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "Power rationing in the world's factory is an export ban nobody "
         "announced — the shortage arrives basket by basket downstream.",
         ("coal", "aluminium"),
+        outcomes=(
+            Outcome("Magnesium", "roughly quintupled as smelters idled, alarming European carmakers", "Sep – Oct 2021"),
+        ),
     ),
 )
 
