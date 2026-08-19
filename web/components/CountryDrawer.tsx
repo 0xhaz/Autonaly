@@ -121,26 +121,70 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function BarRow({ label, share, value, flagged }: {
+/** Animate a number from zero on mount; reduced-motion lands immediately. */
+function useCountUp(target: number, durationMs = 550): number {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      if (reduced) {
+        setValue(target);
+        return;
+      }
+      const t = Math.min((now - start) / durationMs, 1);
+      // Same ease as the bar so digits and bar arrive together.
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(target * eased);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, durationMs]);
+  return value;
+}
+
+function BarRow({ label, fullName, share, value, flagged, index = 0 }: {
   label: string;
+  fullName?: string;
   share: number;
   value: number;
   flagged?: boolean;
+  index?: number;
 }) {
+  const animatedShare = useCountUp(share);
+  const animatedValue = useCountUp(value);
+  const delay = `${index * 35}ms`;
   return (
-    <div className="flex items-center gap-2 py-[3px]">
-      <span className="mono w-[7.5rem] shrink-0 truncate text-xs" title={label}>{label}</span>
+    <div className="group flex items-center gap-2 py-[3px]">
+      <span className="mono w-[7.5rem] shrink-0 truncate text-xs" title={fullName ?? label}>
+        {fullName && fullName !== label ? (
+          <>
+            <span className="group-hover:hidden">{label}</span>
+            <span className="hidden group-hover:inline" style={{ fontFamily: "inherit" }}>
+              {fullName}
+            </span>
+          </>
+        ) : (
+          label
+        )}
+      </span>
       <div className="h-[13px] flex-1">
         <div
-          className="h-full rounded-[3px]"
-          style={{ width: `${Math.max(share * 100, 1.5)}%`, background: flagged ? DISRUPTED : SERIES }}
+          className="bar-grow h-full rounded-[3px]"
+          style={{
+            width: `${Math.max(share * 100, 1.5)}%`,
+            background: flagged ? DISRUPTED : SERIES,
+            animationDelay: delay,
+          }}
         />
       </div>
-      <span className="mono w-11 shrink-0 text-right text-xs" style={{ color: "var(--muted)" }}>
-        {(share * 100).toFixed(1)}%
+      <span className="mono w-11 shrink-0 text-right text-xs tabular-nums" style={{ color: "var(--muted)" }}>
+        {(animatedShare * 100).toFixed(1)}%
       </span>
-      <span className="mono w-14 shrink-0 text-right text-xs" style={{ color: "var(--muted)" }}>
-        {formatKusd(value)}
+      <span className="mono w-14 shrink-0 text-right text-xs tabular-nums" style={{ color: "var(--muted)" }}>
+        {formatKusd(animatedValue)}
       </span>
     </div>
   );
@@ -179,6 +223,13 @@ export default function CountryDrawer({
   const [error, setError] = useState<string | null>(null);
   const [portsByCountry, setPortsByCountry] = useState<Record<string, Port[]> | null>(null);
   const [tab, setTab] = useState<"overview" | "analysis" | "history">("overview");
+  const [countryNames, setCountryNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    fetch("/country-names.json")
+      .then((r) => r.json())
+      .then(setCountryNames)
+      .catch(() => {});
+  }, []);
 
   const loading = country !== null && profile?.country !== country && error === null;
 
@@ -421,21 +472,21 @@ export default function CountryDrawer({
               title={`Imports from · ${profile.basket_labels.length} basket${profile.basket_labels.length === 1 ? "" : "s"}`}
               note={sources.length ? "Red marks a disrupted origin." : undefined}
             >
-              {profile.import_sources.map((r) => (
-                <BarRow key={r.country} label={r.country} share={r.share} value={r.value_kusd} flagged={r.disrupted} />
+              {profile.import_sources.map((r, i) => (
+                <BarRow key={r.country} label={r.country} fullName={countryNames[r.country]} share={r.share} value={r.value_kusd} flagged={r.disrupted} index={i} />
               ))}
             </Group>
 
             <Group title="Exports to">
-              {profile.export_destinations.map((r) => (
-                <BarRow key={r.country} label={r.country} share={r.share} value={r.value_kusd} />
+              {profile.export_destinations.map((r, i) => (
+                <BarRow key={r.country} label={r.country} fullName={countryNames[r.country]} share={r.share} value={r.value_kusd} index={i} />
               ))}
             </Group>
 
             {eco && eco.top_import_baskets.length > 0 && (
               <Group title="What it buys" note="Share of the country's total goods imports.">
-                {eco.top_import_baskets.slice(0, 5).map((b) => (
-                  <BarRow key={b.basket} label={prettyBasket(b.basket)} share={b.share_of_trade} value={b.value_kusd} />
+                {eco.top_import_baskets.slice(0, 5).map((b, i) => (
+                  <BarRow key={b.basket} label={prettyBasket(b.basket)} share={b.share_of_trade} value={b.value_kusd} index={i} />
                 ))}
               </Group>
             )}

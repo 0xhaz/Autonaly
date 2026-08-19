@@ -164,3 +164,17 @@ table.rank tr:hover td {
 @media (prefers-reduced-motion: reduce) {
   .radar-marker .ring { animation: none; opacity: 0.5; }
 }
+
+/* Drawer trade bars: grow from the left on mount. Numbers count up in JS;
+   both respect reduced-motion. */
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.bar-grow {
+  transform-origin: left;
+  animation: bar-grow 0.55s cubic-bezier(0.22, 0.8, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar-grow { animation: none; }
+}
