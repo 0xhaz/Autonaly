@@ -405,6 +405,70 @@ def crisis_history(iso3: str) -> dict:
     return {"country": iso3.upper(), "events": [_event_row(e) for e in for_country(iso3.upper())]}
 
 
+@app.get("/history-event/{key}")
+def history_event(key: str) -> dict:
+    """One curated crisis as a full report: the record, the same commodities
+    measured on today's network, its relatives, and whether its countries can
+    anchor a custom scenario now."""
+    from autonaly_core.baskets import BY_KEY as BASKET_KEYS
+    from autonaly_core.conflicts import CUSTOM_MATERIALITY_WORLD_SHARE  # noqa: F401
+    from autonaly_core.history import BY_KEY as HISTORY_KEYS
+    from autonaly_core.history import analogues
+
+    event = HISTORY_KEYS.get(key)
+    if event is None:
+        raise HTTPException(status_code=404, detail=f"unknown crisis {key!r}")
+
+    con, paths = connect(DEFAULT_VERSION, DEFAULT_YEAR)
+
+    # The event's commodities, measured today: what share of world trade the
+    # involved countries supply now. History says what happened; this says how
+    # much the same shock would matter on the current network.
+    today = []
+    for bk in event.baskets:
+        b = BASKET_KEYS[bk]
+        shares = supplier_shares(con, paths, b.codes)
+        share_now = sum(shares.get(c, 0.0) for c in event.countries)
+        today.append(
+            {
+                "basket": bk,
+                "label": b.label,
+                "countries_world_share_now": round(share_now, 4),
+                "world_trade_kusd": round(world_basket_total(con, paths, b.codes), 1),
+            }
+        )
+    today.sort(key=lambda r: r["countries_world_share_now"], reverse=True)
+
+    related = [
+        _event_row(e)
+        for e in analogues(
+            countries=event.countries,
+            baskets=event.baskets,
+            chokepoints=event.chokepoints,
+            limit=5,
+        )
+        if e.key != event.key
+    ][:4]
+
+    matrix = _share_matrix(DEFAULT_VERSION, DEFAULT_YEAR)
+    context = country_context(paths.context)
+    countries = [
+        {
+            "iso3": c,
+            "name": context.get(c, {}).get("name") or c,
+            "custom_eligible": bool(matrix.get(c)),
+        }
+        for c in event.countries
+    ]
+
+    return {
+        **_event_row(event),
+        "countries_detail": countries,
+        "commodities_today": today,
+        "related": related,
+    }
+
+
 @app.get("/history-analogues")
 def history_analogues(
     countries: str = "", baskets: str = "", chokepoints: str = "", limit: int = 5

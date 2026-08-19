@@ -108,18 +108,27 @@ const UNCURATED_REASONS: Record<string, string> = {
 const DEFAULT_UNCURATED = "Routing not yet curated — flows must be assigned deliberately, not guessed.";
 
 export default function Simulator() {
-  const [mode, setMode] = useState<Mode>("chokepoint");
+  // A crisis page's "run the modern version" deep link (?custom=RUS,UKR)
+  // prefills a custom conflict and runs it once the controls hydrate.
+  const searchParams = useSearchParams();
+  const customPrefill = (searchParams.get("custom") ?? "")
+    .split(",")
+    .map((c) => c.trim().toUpperCase())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  const [mode, setMode] = useState<Mode>(customPrefill.length ? "conflict" : "chokepoint");
 
   // chokepoint mode
   const [chokepoints, setChokepoints] = useState<ChokepointMeta[]>([]);
   const [selected, setSelected] = useState<string>("");
   const [allStraits, setAllStraits] = useState<string[]>([]);
   const [conflicts, setConflicts] = useState<ConflictMeta[]>([]);
-  const [conflictKey, setConflictKey] = useState<string>("");
+  const [conflictKey, setConflictKey] = useState<string>(customPrefill.length ? "custom" : "");
   const [conflictResult, setConflictResult] = useState<ConflictResult | null>(null);
   const [channelKey, setChannelKey] = useState<string>("");
   const [customCountries, setCustomCountries] = useState<CustomCountry[]>([]);
-  const [customPicked, setCustomPicked] = useState<string[]>([]);
+  const [customPicked, setCustomPicked] = useState<string[]>(customPrefill);
   // port mode
   const [portsByCountry, setPortsByCountry] = useState<Record<string, Port[]>>({});
   const [countryNames, setCountryNames] = useState<Record<string, string>>({});
@@ -140,8 +149,7 @@ export default function Simulator() {
   // A scenario reopened from the dashboard: params are applied to state, the
   // deterministic engine replays the run, and the stored brief (the one thing
   // that cannot be recomputed) is restored after the results land.
-  const searchParams = useSearchParams();
-  const autoRunRef = useRef(false);
+  const autoRunRef = useRef(customPrefill.length > 0);
   const savedBriefRef = useRef<string | null>(null);
   // Concurrency guard: StrictMode double-mounts and double-clicks must not
   // issue two engine calls for one intent.
@@ -154,7 +162,7 @@ export default function Simulator() {
         setChokepoints(meta.chokepoints ?? []);
         if (meta.chokepoints?.length) setSelected(meta.chokepoints[0].key);
         setConflicts(meta.conflicts ?? []);
-        if (meta.conflicts?.length) setConflictKey(meta.conflicts[0].key);
+        if (meta.conflicts?.length) setConflictKey((k) => k || meta.conflicts[0].key);
         setCustomCountries(meta.customConflictCountries ?? []);
       })
       .catch(() => setError("engine unavailable"));
@@ -317,9 +325,11 @@ export default function Simulator() {
             : Boolean(currentConflict);
     if (!ready) return;
     autoRunRef.current = false;
-    // Deferred so the replay's state updates start outside the effect pass.
-    const timer = setTimeout(() => void run(), 0);
-    return () => clearTimeout(timer);
+    // Deferred so the run's state updates start outside the effect pass. No
+    // cleanup on purpose: under StrictMode's mount-unmount-mount, a cleanup
+    // would cancel the one scheduled run and the spent ref would never
+    // reschedule it. autoRunRef + inFlightRef already guarantee single-fire.
+    setTimeout(() => void run(), 0);
     // run() is recreated per render; the ref guard makes this fire once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, current, currentPort, conflictKey, customPicked, currentConflict]);

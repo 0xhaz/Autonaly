@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useState } from "react";
 
 import { formatKusd, formatPercent, type AffectedCountry } from "@/lib/types";
@@ -453,7 +455,7 @@ export default function CountryDrawer({
               </p>
             )}
             {(profile.crisis_history ?? []).map((e) => (
-              <div key={e.key} className="rounded-md p-3" style={{ background: "var(--panel-2)", border: "1px solid var(--line)" }}>
+              <Link key={e.key} href={`/crisis/${e.key}`} className="block rounded-md p-3 transition-colors hover:border-[color:var(--accent)]" style={{ background: "var(--panel-2)", border: "1px solid var(--line)" }}>
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-xs font-semibold">{e.title}</span>
                   <span className="mono shrink-0 text-[11px]" style={{ color: "var(--accent)" }}>
@@ -470,7 +472,10 @@ export default function CountryDrawer({
                 <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "var(--muted)" }}>
                   <span style={{ color: "var(--warn)" }}>Rhyme:</span> {e.rhyme}
                 </p>
-              </div>
+                <p className="mt-1.5 text-[10px] uppercase tracking-wider" style={{ color: "var(--accent)" }}>
+                  Open the full record →
+                </p>
+              </Link>
             ))}
           </div>
         )}
