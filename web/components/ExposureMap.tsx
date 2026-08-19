@@ -40,11 +40,14 @@ const MAPLIBRE_URL = "/vendor/maplibre/maplibre-gl.mjs";
 // an absolute scale the whole map renders near-black — technically faithful and
 // completely unreadable. The legend below the map states the range so the
 // shading can never imply a severity the numbers do not support.
-// Single-hue sequential blue, dark->light for a dark surface, so "near zero"
-// recedes toward the background. The earlier ramp ran blue->teal->amber->red,
-// which is the rainbow-for-magnitude anti-pattern: multi-hue ramps invent
-// category boundaries the data does not have.
-const RAMP_COLORS = ["#104281", "#184f95", "#256abf", "#3987e5", "#6da7ec", "#9ec5f4"];
+// Semantic heat ramp: risk is the canonical case where multi-hue is right —
+// blue reads calm, yellow elevated, red severe, and the scale legend makes the
+// mapping explicit. The domain still adapts to the briefing's actual range so a
+// bypass-attenuated event is not stretched to full red.
+// ColorBrewer RdYlBu (reversed): its pale-yellow centre is the point — a naive
+// blue->yellow blend passes through muddy olive, and this ramp is engineered
+// not to.
+const RAMP_COLORS = ["#4575b4", "#91bfdb", "#ffe090", "#fc8d59", "#d73027"];
 
 // Land outside the ranking has to be visible against the water without competing
 // with the ramp. Lightness alone cannot do that job here — a light neutral made
@@ -72,16 +75,24 @@ interface WorldFeature {
   geometry: unknown;
 }
 
+export interface MapMarker {
+  lat: number;
+  lon: number;
+  label: string;
+}
+
 export default function ExposureMap({
   affected,
   highlight,
   selected,
   onSelect,
+  marker,
 }: {
   affected: AffectedCountry[];
   highlight?: string | null;
   selected?: string | null;
   onSelect?: (iso3: string) => void;
+  marker?: MapMarker | null;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibre>(null);
@@ -225,6 +236,19 @@ export default function ExposureMap({
 
     m.addControl(new maplibre.NavigationControl({ showCompass: false }), "top-right");
 
+    if (marker) {
+      // A DOM marker rather than a symbol layer: CSS animates the radar ping
+      // for free, and there is exactly one of these per map.
+      const el = document.createElement("div");
+      el.className = "radar-marker";
+      el.title = marker.label;
+      el.innerHTML =
+        '<span class="ring"></span><span class="ring delay"></span><span class="core"></span>';
+      new maplibre.Marker({ element: el })
+        .setLngLat([marker.lon, marker.lat])
+        .addTo(m);
+    }
+
     const popup = new maplibre.Popup({ closeButton: false, closeOnMove: true });
 
     let hovered: string | null = null;
@@ -317,14 +341,24 @@ export default function ExposureMap({
         style={{ color: "var(--muted)" }}
       >
         <span className="flex items-center gap-2">
-          <span>exposure score</span>
+          <span>risk</span>
           <span className="mono">0</span>
           <span
             className="h-2 w-32 rounded-sm"
             style={{ background: `linear-gradient(to right, ${RAMP_COLORS.join(",")})` }}
           />
           <span className="mono">{domainMax.toFixed(1)}</span>
+          <span>low → severe</span>
         </span>
+        {marker && (
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: "#ff5148" }}
+            />
+            {marker.label}
+          </span>
+        )}
         <span>· white outline = largest value at risk</span>
         <span style={{ color: "#e8a33d" }}>· amber = selected</span>
         <span className="ml-auto">click any country to inspect</span>

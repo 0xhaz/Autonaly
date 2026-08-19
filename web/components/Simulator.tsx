@@ -20,6 +20,8 @@ interface ChokepointMeta {
   reroute: string;
   attenuation: number;
   note: string;
+  lat: number;
+  lon: number;
 }
 
 export default function Simulator() {
@@ -174,7 +176,16 @@ export default function Simulator() {
             Hypothetical scenario · methodology {rankings.methodology_version} · same
             deterministic engine that scores real events · no model involved
           </p>
-          <BriefingWorkspace rankings={rankings} sources={rankings.sources ?? []} />
+          <BriefingWorkspace
+            // Remount per scenario: the map builds its style once, so a fresh
+            // run must not inherit the previous run's shading.
+            key={`${rankings.event_key}-${reduction}-${months}`}
+            rankings={rankings}
+            sources={rankings.sources ?? []}
+            marker={
+              current ? { lat: current.lat, lon: current.lon, label: current.label } : null
+            }
+          />
         </>
       )}
     </div>

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import CountryPanel from "@/components/CountryPanel";
-import ExposureMap from "@/components/ExposureMap";
+import ExposureMap, { type MapMarker } from "@/components/ExposureMap";
 import { formatKusd, formatPercent, type Rankings } from "@/lib/types";
 
 /**
@@ -50,10 +50,31 @@ function StatTile({
 export default function BriefingWorkspace({
   rankings,
   sources,
+  marker,
 }: {
   rankings: Rankings;
   sources: string[];
+  marker?: MapMarker | null;
 }) {
+  // ISO3 -> full name, from the same geometry the map already ships. Loaded
+  // once; a code the atlas does not know falls back to itself.
+  const [names, setNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/world.geo.json")
+      .then((r) => r.json())
+      .then((w) => {
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        for (const f of w.features) map[f.properties.iso3] = f.properties.name;
+        setNames(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const largest = rankings.largest_absolute_exposure ?? null;
   const [selected, setSelected] = useState<string | null>(largest);
 
@@ -109,6 +130,7 @@ export default function BriefingWorkspace({
             highlight={largest}
             selected={selected}
             onSelect={setSelected}
+            marker={marker}
           />
         </div>
         <CountryPanel
@@ -153,8 +175,11 @@ export default function BriefingWorkspace({
                       a.country === selected ? "var(--panel-2)" : undefined,
                   }}
                 >
-                  <td className="mono font-semibold">
-                    {a.country}
+                  <td className="font-medium">
+                    {names[a.country] ?? a.country}{" "}
+                    <span className="mono text-[11px]" style={{ color: "var(--muted)" }}>
+                      {a.country}
+                    </span>
                     {a.country === largest && (
                       <span className="ml-2 chip chip-curated">largest</span>
                     )}

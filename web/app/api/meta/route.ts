@@ -23,12 +23,16 @@ export async function GET() {
           reroute: string;
           attenuation: number;
           note: string;
+          lat: number;
+          lon: number;
         }) => ({
           key: c.key,
           label: c.label,
           reroute: c.reroute,
           attenuation: c.attenuation,
           note: c.note,
+          lat: c.lat,
+          lon: c.lon,
         }),
       ),
     });
