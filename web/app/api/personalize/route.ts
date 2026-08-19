@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { briefing_id, force } = await request.json();
+  const { briefing_id, force, peek } = await request.json();
   if (!briefing_id) {
     return NextResponse.json({ error: "briefing_id required" }, { status: 422 });
   }
@@ -26,6 +26,11 @@ export async function POST(request: NextRequest) {
   if (!force) {
     const cached = await getPersonalReport(userId, briefing_id);
     if (cached) return NextResponse.json({ report: cached, cached: true });
+  }
+  if (peek) {
+    // A look at the cache must never cost a generation — the card on mount
+    // asks "is there a note?" and generation stays an explicit act.
+    return NextResponse.json({ report: null, cached: false });
   }
 
   const [profile, briefing] = await Promise.all([

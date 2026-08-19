@@ -58,7 +58,7 @@ function renderNote(text: string) {
   });
 }
 
-function EventCard({ briefing }: { briefing: Briefing }) {
+function EventCard({ briefing, autoGenerate }: { briefing: Briefing; autoGenerate?: boolean }) {
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,24 +83,28 @@ function EventCard({ briefing }: { briefing: Briefing }) {
     [briefing.id],
   );
 
-  // Show a cached note if one exists; never auto-spend a generation.
+  // Show a cached note if one exists — peek never spends a generation. The
+  // one exception is the hire moment: the newest event's note is generated
+  // immediately, so the analyst's first read is waiting before it's asked for.
   useEffect(() => {
     let cancelled = false;
     fetch("/api/personalize", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ briefing_id: briefing.id }),
+      body: JSON.stringify({ briefing_id: briefing.id, peek: true }),
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((body) => {
-        if (!cancelled && body?.cached) setReport(body.report);
+        if (cancelled) return;
+        if (body?.cached) setReport(body.report);
+        else if (autoGenerate) void generate(false);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
      
-  }, [briefing.id]);
+  }, [briefing.id, autoGenerate, generate]);
 
   return (
     <article className="panel p-4">
@@ -214,6 +218,15 @@ function SavedScenarios() {
 export default function PersonalDashboard({ briefings }: { briefings: Briefing[] }) {
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [editing, setEditing] = useState(false);
+  const [justHired, setJustHired] = useState(false);
+  const [names, setNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/country-names.json")
+      .then((r) => r.json())
+      .then(setNames)
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(() => {
     fetch("/api/profile")
@@ -234,6 +247,9 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
         <AnalystBuilder
           initial={profile}
           onSaved={() => {
+            // A first hire earns instant gratification: the newest event's
+            // personal note generates unprompted. Edits don't re-spend.
+            if (profile === null) setJustHired(true);
             setEditing(false);
             load();
           }}
@@ -253,7 +269,8 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
         <div>
           <h1 className="text-xl font-semibold">{profile.analyst_name}</h1>
           <p className="mono mt-1 text-xs" style={{ color: "var(--muted)" }}>
-            watching {profile.baskets.length} commodities · {profile.countries.join(", ") || "no countries"} ·{" "}
+            watching {profile.baskets.length} commodities ·{" "}
+            {profile.countries.map((c) => names[c] ?? c).join(", ") || "no countries"} ·{" "}
             {profile.chokepoints.join(", ") || "no chokepoints"}
           </p>
         </div>
@@ -273,7 +290,9 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
         {briefings.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--muted)" }}>No events on the desk.</p>
         ) : (
-          briefings.map((b) => <EventCard key={b.id} briefing={b} />)
+          briefings.map((b, i) => (
+            <EventCard key={b.id} briefing={b} autoGenerate={justHired && i === 0} />
+          ))
         )}
       </section>
     </div>

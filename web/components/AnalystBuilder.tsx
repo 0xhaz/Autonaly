@@ -32,18 +32,27 @@ const TEMPLATES = [
     baskets: ["crude_oil", "refined_products", "lng", "lpg"],
     chokepoints: ["hormuz", "suez", "malacca"],
     countries: ["JPN", "KOR", "IND", "CHN"],
+    watches: "Crude, refined products, LNG, LPG",
+    via: "Hormuz · Suez · Malacca",
+    where: "Japan, South Korea, India, China",
   },
   {
     name: "Food Security Desk",
     baskets: ["wheat", "maize", "rice", "nitrogen_fertilizer", "potash"],
     chokepoints: ["bosporus", "suez"],
     countries: ["EGY", "TUR", "KEN", "PAK"],
+    watches: "Wheat, maize, rice, fertilizers",
+    via: "Bosporus · Suez",
+    where: "Egypt, Turkey, Kenya, Pakistan",
   },
   {
     name: "Tech Supply Desk",
     baskets: ["semiconductors", "rare_earth_magnets", "lithium", "cobalt"],
     chokepoints: ["malacca"],
     countries: ["TWN", "VNM", "KOR", "DEU"],
+    watches: "Semiconductors, magnets, lithium, cobalt",
+    via: "Malacca",
+    where: "Taiwan, Vietnam, South Korea, Germany",
   },
 ];
 
@@ -71,6 +80,12 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
       )
       .catch(() => {});
   }, []);
+
+  const countryName = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of countries) map[c.iso3] = c.name;
+    return map;
+  }, [countries]);
 
   const matches = useMemo(() => {
     if (!countryQuery) return [];
@@ -140,12 +155,23 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
         <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
           Start from a desk
         </label>
-        <div className="flex flex-wrap gap-2 pt-1">
+        <div className="grid gap-2 pt-1 sm:grid-cols-3">
           {TEMPLATES.map((t) => (
             <button key={t.name} type="button" onClick={() => applyTemplate(t)}
-              className="rounded-md px-3 py-1.5 text-xs font-medium"
-              style={{ border: "1px solid var(--line)", color: "var(--text)" }}>
-              {t.name}
+              className="rounded-md p-3 text-left transition-colors hover:border-[color:var(--accent)]"
+              style={{ border: "1px solid var(--line)", background: "var(--panel-2)" }}>
+              <span className="block text-xs font-semibold" style={{ color: "var(--text)" }}>
+                {t.name}
+              </span>
+              <span className="mt-1 block text-[11px] leading-relaxed" style={{ color: "var(--muted)" }}>
+                {t.watches}
+              </span>
+              <span className="mono mt-1 block text-[10px]" style={{ color: "var(--accent)" }}>
+                via {t.via}
+              </span>
+              <span className="block text-[10px]" style={{ color: "var(--muted)" }}>
+                {t.where}
+              </span>
             </button>
           ))}
         </div>
@@ -185,8 +211,8 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
         <div className="flex flex-wrap gap-1.5">
           {[...watched].map((iso3) => (
             <button key={iso3} type="button" onClick={() => toggle(watched, setWatched, iso3)}
-              className="mono rounded-full px-2.5 py-1 text-xs" style={chip(true)}>
-              {iso3} ✕
+              className="rounded-full px-2.5 py-1 text-xs" style={chip(true)}>
+              {countryName[iso3] ?? iso3} <span className="mono text-[10px]">{iso3}</span> ✕
             </button>
           ))}
         </div>
