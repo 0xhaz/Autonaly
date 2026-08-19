@@ -70,7 +70,10 @@ def fetch_ports(limit: int) -> list[dict]:
         PORTS,
         {
             "where": "1=1",
-            "outFields": "portname,country,ISO3,lat,lon,vessel_count_total,industry_top1",
+            "outFields": (
+                "portname,country,ISO3,lat,lon,vessel_count_total,industry_top1,"
+                "share_country_maritime_import,share_country_maritime_export"
+            ),
             "orderByFields": "vessel_count_total DESC",
             "resultRecordCount": str(limit),
             "returnGeometry": "false",
@@ -145,11 +148,16 @@ def port_directory() -> dict:
         iso3 = (a.get("ISO3") or "").strip()
         if not iso3:
             continue
+        # PortWatch stores the shares as 0-100 percentages; publish fractions.
         grouped.setdefault(iso3, []).append(
             {
                 "name": a.get("portname"),
                 "vessels": a.get("vessel_count_total") or 0,
                 "industry": a.get("industry_top1"),
+                "lat": round(a["lat"], 4) if a.get("lat") is not None else None,
+                "lon": round(a["lon"], 4) if a.get("lon") is not None else None,
+                "export_share": round((a.get("share_country_maritime_export") or 0) / 100, 4),
+                "import_share": round((a.get("share_country_maritime_import") or 0) / 100, 4),
             }
         )
     for rows in grouped.values():

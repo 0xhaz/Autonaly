@@ -38,9 +38,11 @@ ABSOLUTE RULES:
 
 Write exactly these sections:
 
-**The premise** — one sentence: the chokepoint, the reduction, the duration,
-and whether cargo can divert. If a bypass exists, say the scores are attenuated
-for it and why that matters.
+**The premise** — one sentence: what is disrupted (a strait or a port), the
+effective reduction, the duration, and what can divert. If a bypass or
+diversion exists, say the scores are attenuated for it and why that matters.
+For a port: the reduction is the port's share of the country's maritime
+exports times the share of the port lost — say so.
 
 **Who is hit, and how** — magnitude first, then intensity, naming at most two
 countries. Explain in one sentence why the two orderings differ here.
