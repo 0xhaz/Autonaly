@@ -72,9 +72,20 @@ interface Transit {
   bypass: boolean;
 }
 
+interface CrisisRow {
+  key: string;
+  title: string;
+  year_start: number;
+  year_end: number | null;
+  category: string;
+  summary: string;
+  rhyme: string;
+}
+
 interface Profile {
   country: string;
   chokepoints: Transit[];
+  crisis_history?: CrisisRow[];
   context: Context | null;
   economy: Economy;
   basket_labels: string[];
@@ -165,7 +176,7 @@ export default function CountryDrawer({
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [portsByCountry, setPortsByCountry] = useState<Record<string, Port[]> | null>(null);
-  const [tab, setTab] = useState<"overview" | "analysis">("overview");
+  const [tab, setTab] = useState<"overview" | "analysis" | "history">("overview");
 
   const loading = country !== null && profile?.country !== country && error === null;
 
@@ -274,7 +285,7 @@ export default function CountryDrawer({
         </header>
 
         <div className="mt-3 flex gap-1 rounded-md p-0.5" style={{ background: "var(--panel-2)" }}>
-          {(["overview", "analysis"] as const).map((t) => (
+          {(["overview", "analysis", "history"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -286,7 +297,7 @@ export default function CountryDrawer({
                 border: tab === t ? "1px solid var(--line)" : "1px solid transparent",
               }}
             >
-              {t === "overview" ? "Overview" : "Trade analysis"}
+              {t === "overview" ? "Overview" : t === "analysis" ? "Trade analysis" : "Crisis history"}
             </button>
           ))}
         </div>
@@ -426,6 +437,41 @@ export default function CountryDrawer({
                 ))}
               </Group>
             )}
+          </div>
+        )}
+
+        {profile && !loading && tab === "history" && (
+          <div className="mt-4 space-y-3">
+            <p className="text-[11px]" style={{ color: "var(--muted)" }}>
+              A century of supply crises involving this country — curated from
+              the historical record, not generated. History doesn&apos;t repeat,
+              but it rhymes: these are the reference class for the next one.
+            </p>
+            {(profile.crisis_history ?? []).length === 0 && (
+              <p className="text-xs" style={{ color: "var(--muted)" }}>
+                No curated crisis events for this country yet.
+              </p>
+            )}
+            {(profile.crisis_history ?? []).map((e) => (
+              <div key={e.key} className="rounded-md p-3" style={{ background: "var(--panel-2)", border: "1px solid var(--line)" }}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-semibold">{e.title}</span>
+                  <span className="mono shrink-0 text-[11px]" style={{ color: "var(--accent)" }}>
+                    {e.year_start}
+                    {e.year_end === null ? "–" : e.year_end !== e.year_start ? `–${e.year_end}` : ""}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+                  {e.category.replace("_", " ")}
+                </div>
+                <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "#cdd9e8" }}>
+                  {e.summary}
+                </p>
+                <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "var(--muted)" }}>
+                  <span style={{ color: "var(--warn)" }}>Rhyme:</span> {e.rhyme}
+                </p>
+              </div>
+            ))}
           </div>
         )}
       </aside>

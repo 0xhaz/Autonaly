@@ -343,6 +343,8 @@ def country_profile(
             }
         )
 
+    from autonaly_core.history import for_country as crisis_events_for
+
     economy = country_economy(
         con, paths, iso3, {b.key: b.codes for b in BY_KEY.values() if not b.parent}
     )
@@ -357,6 +359,7 @@ def country_profile(
         "context": context or None,
         "economy": economy,
         "chokepoints": transits,
+        "crisis_history": [_event_row(e) for e in crisis_events_for(iso3)],
         "baskets": keys,
         "basket_labels": [BY_KEY[k].label for k in keys],
         "total_imports_kusd": round(total_imports, 1),
@@ -377,6 +380,46 @@ def country_profile(
         ],
         "methodology_version": METHODOLOGY_VERSION,
     }
+
+
+def _event_row(e) -> dict:  # noqa: ANN001 - CrisisEvent
+    return {
+        "key": e.key,
+        "title": e.title,
+        "year_start": e.year_start,
+        "year_end": e.year_end,
+        "countries": list(e.countries),
+        "category": e.category,
+        "summary": e.summary,
+        "rhyme": e.rhyme,
+        "baskets": list(e.baskets),
+        "chokepoints": list(e.chokepoints),
+    }
+
+
+@app.get("/history/{iso3}")
+def crisis_history(iso3: str) -> dict:
+    """A century of curated supply crises involving the country."""
+    from autonaly_core.history import for_country
+
+    return {"country": iso3.upper(), "events": [_event_row(e) for e in for_country(iso3.upper())]}
+
+
+@app.get("/history-analogues")
+def history_analogues(
+    countries: str = "", baskets: str = "", chokepoints: str = "", limit: int = 5
+) -> dict:
+    """The reference class for a hypothetical: past crises that rhyme with it."""
+    from autonaly_core.history import analogues
+
+    split = lambda v: tuple(x.strip().upper() for x in v.split(",") if x.strip())  # noqa: E731
+    rows = analogues(
+        countries=split(countries),
+        baskets=tuple(x.strip() for x in baskets.split(",") if x.strip()),
+        chokepoints=tuple(x.strip() for x in chokepoints.split(",") if x.strip()),
+        limit=max(1, min(limit, 10)),
+    )
+    return {"analogues": [_event_row(e) for e in rows]}
 
 
 _SHARE_MATRIX_CACHE: dict[tuple[str, int], dict[str, dict[str, float]]] = {}

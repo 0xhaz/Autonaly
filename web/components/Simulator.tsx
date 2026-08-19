@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import BriefingWorkspace from "@/components/BriefingWorkspace";
+import HistoricalRhymes from "@/components/HistoricalRhymes";
 import { formatKusd, type Rankings } from "@/lib/types";
 
 /**
@@ -828,6 +829,12 @@ export default function Simulator() {
             sources={rankings.sources ?? []}
             marker={marker}
           />
+
+          <HistoricalRhymes
+            countries={mode === "port" ? [portCountry, ...(rankings.sources ?? [])] : rankings.sources ?? []}
+            baskets={rankings.baskets ?? []}
+            chokepoints={mode === "chokepoint" && current ? [current.key] : []}
+          />
         </>
       )}
 
@@ -935,6 +942,12 @@ export default function Simulator() {
               ))}
             </div>
           </section>
+
+          <HistoricalRhymes
+            countries={[...new Set(conflictResult.channels.flatMap((c) => c.sources))]}
+            baskets={[...new Set(conflictResult.channels.flatMap((c) => c.rankings.baskets ?? []))]}
+            chokepoints={[]}
+          />
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>

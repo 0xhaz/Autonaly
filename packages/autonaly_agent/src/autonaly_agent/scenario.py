@@ -51,6 +51,13 @@ exports times the share of the port lost — say so.
 **Who is hit, and how** — magnitude first, then intensity, naming at most two
 countries. Explain in one sentence why the two orderings differ here.
 
+**Historical rhymes** — ONLY if SCENARIO contains a non-empty `history` list.
+Cite one to three of those events by title and year. For each: one sentence on
+what rhymes with this premise, and what differs. These are curated records —
+never mention an event that is not in the list, and never invent dates or
+figures about them beyond what the list states. If `history` is absent or
+empty, omit this section entirely.
+
 **What the model omits** — the honest limits, specific to this scenario:
 latest-year trade weights, first-order effects only, no inventories or
 substitution, and anything notable about this chokepoint's data.

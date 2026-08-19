@@ -124,9 +124,12 @@ export default function AboutPage() {
           simulator builds the crisis for you: every commodity where that country
           supplies at least 1% of world trade becomes a disruption channel, and the
           engine ranks who gets hurt, by how much, in dollars. Ask the desk for a
-          written read, save the scenario to your dashboard, and export the brief as
-          Markdown for your own report. Reopening a saved scenario replays it on the
-          live engine — the numbers are reproducible, not remembered.
+          written read — grounded in a curated century of supply crises, so your
+          speculation arrives with its historical reference class: history
+          doesn&apos;t repeat, but it rhymes. Save the scenario to your dashboard
+          and export the brief as Markdown for your own report. Reopening a saved
+          scenario replays it on the live engine — the numbers are reproducible,
+          not remembered.
         </p>
         <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
           The judgment stays yours. The desk deliberately refuses to say how likely
