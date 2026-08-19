@@ -53,9 +53,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/simulate" className="text-xs" style={{ color: "var(--muted)" }}>
                 Simulator
               </Link>
-              <p className="hidden text-xs lg:block" style={{ color: "var(--muted)" }}>
-                Gemini reasons · the engine computes · a human approves
-              </p>
+              <Link href="/about" className="text-xs" style={{ color: "var(--muted)" }}>
+                About
+              </Link>
               <Show when="signed-out">
                 <SignInButton mode="modal">
                   <button
