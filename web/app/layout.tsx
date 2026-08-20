@@ -38,7 +38,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               colorMutedForeground: "#8b9bb4",
               colorInput: "#172030",
               colorInputForeground: "#e6edf6",
+              // Social buttons and secondary chrome derive from neutral; on a
+              // dark background it must be light or their labels vanish.
+              colorNeutral: "#e6edf6",
               borderRadius: "8px",
+            },
+            elements: {
+              socialButtonsBlockButton: {
+                background: "#172030",
+                border: "1px solid #223047",
+                color: "#e6edf6",
+              },
+              socialButtonsBlockButtonText: { color: "#e6edf6" },
             },
           }}
         >
