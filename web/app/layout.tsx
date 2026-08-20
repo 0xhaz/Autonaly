@@ -3,11 +3,12 @@ import {
   ClerkProvider,
   Show,
   SignInButton,
-  SignUpButton,
   UserButton,
 } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import Link from "next/link";
+
+import Sidebar from "@/components/Sidebar";
 
 import "./globals.css";
 
@@ -41,72 +42,58 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             },
           }}
         >
-        <header className="border-b" style={{ borderColor: "var(--line)" }}>
-          <div className="mx-auto flex max-w-[1700px] items-center justify-between px-5 py-3">
-            <Link href="/" className="flex items-baseline gap-3">
-              <span className="text-lg font-semibold tracking-tight">Autonaly</span>
-              <span className="text-xs" style={{ color: "var(--muted)" }}>
-                crisis briefing review
-              </span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link href="/simulate" className="text-xs" style={{ color: "var(--muted)" }}>
-                Simulator
-              </Link>
-              <Link href="/about" className="text-xs" style={{ color: "var(--muted)" }}>
-                About
-              </Link>
-              <Show when="signed-out">
-                <SignInButton mode="modal">
-                  <button
-                    className="rounded-md px-3 py-1.5 text-xs font-medium"
-                    style={{ border: "1px solid var(--line)", color: "var(--muted)" }}
-                  >
-                    Sign in
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button
-                    className="rounded-md px-3 py-1.5 text-xs font-semibold"
-                    style={{ background: "var(--accent)", color: "#04121f" }}
-                  >
-                    Build your analyst
-                  </button>
-                </SignUpButton>
-              </Show>
-              <Show when="signed-in">
-                <Link
-                  href="/dashboard"
-                  className="text-xs font-medium"
-                  style={{ color: "var(--accent)" }}
-                >
-                  My analyst
+        {/* Navigation lives in the sidebar; the header keeps only identity
+            and the session — the atlas wants a clean page. */}
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <header className="border-b" style={{ borderColor: "var(--line)" }}>
+              <div className="mx-auto flex w-full max-w-[1700px] items-center justify-between px-5 py-3">
+                <Link href="/" className="flex items-baseline gap-3">
+                  <span className="text-lg font-semibold tracking-tight">Autonaly</span>
+                  <span className="text-xs" style={{ color: "var(--muted)" }}>
+                    crisis briefing review
+                  </span>
                 </Link>
-                <Link
-                  href="/review"
-                  className="text-xs"
-                  style={{ color: "var(--muted)" }}
-                >
-                  Review
-                </Link>
-                <UserButton />
-              </Show>
-            </div>
+                <div className="flex items-center gap-4">
+                  <Show when="signed-out">
+                    <SignInButton mode="modal">
+                      <button
+                        className="rounded-md px-3 py-1.5 text-xs font-semibold"
+                        style={{ background: "var(--accent)", color: "#04121f" }}
+                      >
+                        Sign in
+                      </button>
+                    </SignInButton>
+                  </Show>
+                  <Show when="signed-in">
+                    <Link
+                      href="/dashboard"
+                      className="text-xs font-medium"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      My analyst
+                    </Link>
+                    <UserButton />
+                  </Show>
+                </div>
+              </div>
+            </header>
+            {/* No max-width here: the landing page is a map and wants the room.
+                Text-heavy pages set their own reading measure. */}
+            <main className="mx-auto w-full max-w-[1700px] flex-1 px-5 py-5">{children}</main>
+            <footer
+              className="mx-auto w-full max-w-[1700px] px-5 py-6 text-xs"
+              style={{ color: "var(--muted)" }}
+            >
+              Data: BACI/CEPII (Etalab 2.0) · UN Global Platform; IMF PortWatch. Exposure
+              figures use latest-year trade weights and model first-order effects only ·{" "}
+              <Link href="/methodology" style={{ color: "var(--accent)" }}>
+                methodology
+              </Link>
+            </footer>
           </div>
-        </header>
-        {/* No max-width here: the landing page is a map and wants the room.
-            Text-heavy pages set their own reading measure. */}
-        <main className="mx-auto max-w-[1700px] px-5 py-5">{children}</main>
-        <footer
-          className="mx-auto max-w-[1700px] px-5 py-6 text-xs"
-          style={{ color: "var(--muted)" }}
-        >
-          Data: BACI/CEPII (Etalab 2.0) · UN Global Platform; IMF PortWatch. Exposure
-          figures use latest-year trade weights and model first-order effects only ·{" "}
-          <Link href="/methodology" style={{ color: "var(--accent)" }}>
-            methodology
-          </Link>
-        </footer>
+        </div>
         </ClerkProvider>
       </body>
     </html>
