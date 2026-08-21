@@ -215,6 +215,74 @@ function SavedScenarios() {
   );
 }
 
+function WatchedCountries({
+  countries,
+  names,
+  onChanged,
+}: {
+  countries: string[];
+  names: Record<string, string>;
+  onChanged: () => void;
+}) {
+  const unwatch = async (iso3: string) => {
+    await fetch("/api/profile/watch", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ country: iso3 }),
+    });
+    onChanged();
+  };
+
+  if (countries.length === 0) return null;
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+        Watched countries · live data, not bookmarks
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {countries.map((iso3) => (
+          <div key={iso3} className="panel flex flex-col gap-2 p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold">{names[iso3] ?? iso3}</div>
+                <div className="mono mt-0.5 text-[11px]" style={{ color: "var(--muted)" }}>
+                  {iso3}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => unwatch(iso3)}
+                className="text-xs"
+                style={{ color: "var(--muted)" }}
+                title="Remove from watchlist"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mt-auto flex flex-wrap gap-2">
+              <Link
+                href={`/country/${iso3}`}
+                className="rounded-md px-3 py-1.5 text-xs font-semibold"
+                style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+              >
+                Full profile
+              </Link>
+              <Link
+                href={`/?country=${iso3}`}
+                className="rounded-md px-3 py-1.5 text-xs font-medium"
+                style={{ border: "1px solid var(--line)", color: "var(--muted)" }}
+              >
+                Atlas
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function PersonalDashboard({ briefings }: { briefings: Briefing[] }) {
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [editing, setEditing] = useState(false);
@@ -270,21 +338,8 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
           <h1 className="text-xl font-semibold">{profile.analyst_name}</h1>
           <p className="mono mt-1 text-xs" style={{ color: "var(--muted)" }}>
             watching {profile.baskets.length} commodities ·{" "}
-            {profile.countries.length === 0
-              ? "no countries"
-              : profile.countries.map((c, i) => (
-                  <span key={c}>
-                    {i > 0 && ", "}
-                    <Link
-                      href={`/?country=${c}`}
-                      title="Open in the atlas"
-                      style={{ color: "var(--accent)" }}
-                    >
-                      {names[c] ?? c}
-                    </Link>
-                  </span>
-                ))}{" "}
-            · {profile.chokepoints.join(", ") || "no chokepoints"}
+            {profile.countries.length} countr{profile.countries.length === 1 ? "y" : "ies"} ·{" "}
+            {profile.chokepoints.join(", ") || "no chokepoints"}
           </p>
         </div>
         <button type="button" onClick={() => setEditing(true)}
@@ -293,6 +348,8 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
           Edit watchlist
         </button>
       </header>
+
+      <WatchedCountries countries={profile.countries} names={names} onChanged={load} />
 
       <SavedScenarios />
 
