@@ -34,7 +34,7 @@ function StatTile({
       </div>
       <div
         className="mono mt-1 text-2xl font-semibold tabular-nums"
-        style={{ color: accent ? "#e8a33d" : "var(--text)" }}
+        style={{ color: accent ? "var(--warn)" : "var(--text)" }}
       >
         {value}
       </div>

@@ -102,7 +102,7 @@ function Metric({ label, value, accent }: { label: string; value: string; accent
       </div>
       <div
         className="mono text-sm font-semibold"
-        style={{ color: accent ? "#e8a33d" : "var(--text)" }}
+        style={{ color: accent ? "var(--warn)" : "var(--text)" }}
       >
         {value}
       </div>

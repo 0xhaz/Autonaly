@@ -424,7 +424,7 @@ export default function CountryDrawer({
                       <span className="text-xs font-medium">{t.label}</span>
                       <span
                         className="mono shrink-0 text-[10px] uppercase tracking-wider"
-                        style={{ color: t.bypass ? "var(--muted)" : "#e8a33d" }}
+                        style={{ color: t.bypass ? "var(--muted)" : "var(--warn)" }}
                       >
                         {t.bypass ? "bypass exists" : "no bypass"}
                       </span>
@@ -517,7 +517,7 @@ export default function CountryDrawer({
                 <div className="mt-0.5 text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
                   {e.category.replace("_", " ")}
                 </div>
-                <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "#cdd9e8" }}>
+                <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "var(--text-soft)" }}>
                   {e.summary}
                 </p>
                 <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "var(--muted)" }}>

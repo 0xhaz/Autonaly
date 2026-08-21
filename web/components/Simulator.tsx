@@ -490,7 +490,7 @@ export default function Simulator() {
                     onClick={askDesk}
                     disabled={briefing}
                     className="rounded-md px-4 py-2 text-sm font-semibold"
-                    style={{ background: "var(--accent)", color: "#04121f", opacity: briefing ? 0.6 : 1 }}
+                    style={{ background: "var(--accent)", color: "var(--accent-contrast)", opacity: briefing ? 0.6 : 1 }}
                   >
                     {briefing ? "The desk is reading…" : "Ask the desk about this scenario"}
                   </button>
@@ -541,7 +541,7 @@ export default function Simulator() {
           {brief && (
             <div className="mt-4 rounded-md p-4" style={{ background: "var(--panel-2)", border: "1px solid var(--line)" }}>
               <div className="mb-2 flex items-center gap-2">
-                <span className="chip" style={{ color: "#e8a33d", borderColor: "color-mix(in srgb, #e8a33d 40%, transparent)" }}>
+                <span className="chip" style={{ color: "var(--warn)", borderColor: "color-mix(in srgb, var(--warn) 40%, transparent)" }}>
                   hypothetical
                 </span>
                 <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
@@ -555,13 +555,13 @@ export default function Simulator() {
                   const m = t.match(/^\*\*(.+?)\*\*\s*(.*)$/);
                   if (m) {
                     return (
-                      <p key={i} className="mt-2 text-sm" style={{ color: "#cdd9e8" }}>
+                      <p key={i} className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
                         <strong style={{ color: "var(--text)" }}>{m[1]}</strong> {m[2]}
                       </p>
                     );
                   }
                   return (
-                    <p key={i} className="mt-1.5 text-sm" style={{ color: "#cdd9e8" }}>
+                    <p key={i} className="mt-1.5 text-sm" style={{ color: "var(--text-soft)" }}>
                       {t.replace(/\*\*/g, "")}
                     </p>
                   );
@@ -731,7 +731,7 @@ export default function Simulator() {
             onClick={run}
             disabled={running || (mode === "chokepoint" ? !selected : mode === "port" ? !currentPort : conflictKey === "custom" ? customPicked.length === 0 : !conflictKey)}
             className="self-end rounded-md px-5 py-2 text-sm font-semibold"
-            style={{ background: "var(--accent)", color: "#04121f", opacity: running ? 0.6 : 1 }}
+            style={{ background: "var(--accent)", color: "var(--accent-contrast)", opacity: running ? 0.6 : 1 }}
           >
             {running ? "Computing…" : "Run scenario"}
           </button>
@@ -791,7 +791,7 @@ export default function Simulator() {
           </div>
         )}
         {mode === "chokepoint" && current && (
-          <p className="rounded-md p-2.5 text-xs" style={{ background: "var(--panel-2)", color: current.reroute === "none" ? "#e8a33d" : "var(--muted)" }}>
+          <p className="rounded-md p-2.5 text-xs" style={{ background: "var(--panel-2)", color: current.reroute === "none" ? "var(--warn)" : "var(--muted)" }}>
             {current.reroute === "none"
               ? "No alternative sea route — a closure here is a supply cutoff."
               : "Cargo can divert around this chokepoint — a closure is a cost and delay shock, and scores are attenuated accordingly."}{" "}
@@ -857,7 +857,7 @@ export default function Simulator() {
           </p>
 
           <p className="rounded-md p-3 text-xs" style={{ background: "var(--panel)", border: "1px solid var(--line)", color: "var(--muted)" }}>
-            <span style={{ color: "#e8a33d" }}>Read the numbers as marginal risk on
+            <span style={{ color: "var(--warn)" }}>Read the numbers as marginal risk on
             today&apos;s network:</span>{" "}
             {conflictResult.conflict === "russia_ukraine"
               ? "the 2024 trade weights already embed the rewiring the real war forced — Europe's pivot away from Russian seaborne energy is priced in, which is why Germany ranks small and pipeline-locked Slovakia and Hungary rank large. "
@@ -866,7 +866,7 @@ export default function Simulator() {
           </p>
 
           {(conflictResult.skipped?.length ?? 0) > 0 && (
-            <p className="rounded-md p-3 text-xs" style={{ background: "var(--panel)", border: "1px solid var(--line)", color: "#e8a33d" }}>
+            <p className="rounded-md p-3 text-xs" style={{ background: "var(--panel)", border: "1px solid var(--line)", color: "var(--warn)" }}>
               Not simulated:{" "}
               {conflictResult.skipped!
                 .map((s) => `${s.name} — ${s.reason}`)
@@ -930,7 +930,7 @@ export default function Simulator() {
                 <div key={ch.key} className="rounded-md p-3" style={{ background: "var(--panel-2)", border: "1px solid var(--line)" }}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold">{ch.label}</span>
-                    <span className="mono text-[11px]" style={{ color: "#e8a33d" }}>
+                    <span className="mono text-[11px]" style={{ color: "var(--warn)" }}>
                       −{Math.round(ch.effective_reduction * 100)}%
                     </span>
                   </div>

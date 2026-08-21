@@ -44,14 +44,14 @@ function renderNote(text: string) {
     const parts = t.replace(/^\*\*(.+?)\*\*\s*/, "§$1§").split("§");
     if (parts.length === 3) {
       return (
-        <p key={i} className="mt-2 text-sm" style={{ color: "#cdd9e8" }}>
+        <p key={i} className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
           <strong style={{ color: "var(--text)" }}>{parts[1]}</strong>{" "}
           {parts[2]}
         </p>
       );
     }
     return (
-      <p key={i} className="mt-1.5 text-sm" style={{ color: "#cdd9e8" }}>
+      <p key={i} className="mt-1.5 text-sm" style={{ color: "var(--text-soft)" }}>
         {t.replace(/\*\*/g, "")}
       </p>
     );
@@ -138,7 +138,7 @@ function EventCard({ briefing, autoGenerate }: { briefing: Briefing; autoGenerat
       ) : (
         <button type="button" onClick={() => generate(false)} disabled={loading}
           className="mt-3 rounded-md px-3 py-1.5 text-xs font-semibold"
-          style={{ background: "var(--accent)", color: "#04121f", opacity: loading ? 0.6 : 1 }}>
+          style={{ background: "var(--accent)", color: "var(--accent-contrast)", opacity: loading ? 0.6 : 1 }}>
           {loading ? "Your analyst is reading…" : "What does this mean for me?"}
         </button>
       )}

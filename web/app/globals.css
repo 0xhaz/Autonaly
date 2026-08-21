@@ -6,11 +6,44 @@
   --panel-2: #172030;
   --line: #223047;
   --text: #e6edf6;
+  --text-soft: #cdd9e8;
   --muted: #8b9bb4;
   --accent: #4da3ff;
-  --warn: #f2b544;
+  --accent-contrast: #04121f;
+  --warn: #e8a33d;
   --danger: #ff6b6b;
   --ok: #4ade80;
+  /* MapLibre cannot read CSS variables; the maps resolve these at init and
+     rebuild on theme change. */
+  --map-ocean: #0d1620;
+  --map-land: #27384c;
+  --map-border: #42586e;
+  --map-lane: #cfe2fb;
+  --map-lane-2: #a8c8ea;
+  --map-port: #7fb2e8;
+  --map-unscored: #333b44;
+}
+
+html[data-theme="light"] {
+  --bg: #eef2f7;
+  --panel: #ffffff;
+  --panel-2: #e7edf5;
+  --line: #cfd9e5;
+  --text: #16212e;
+  --text-soft: #3d4e63;
+  --muted: #61718a;
+  --accent: #2277cc;
+  --accent-contrast: #ffffff;
+  --warn: #a16207;
+  --danger: #c03535;
+  --ok: #177a43;
+  --map-ocean: #c9d9ea;
+  --map-land: #f6f9fc;
+  --map-border: #93a7bd;
+  --map-lane: #6d9bd1;
+  --map-lane-2: #5e8fc9;
+  --map-port: #2f74b8;
+  --map-unscored: #dde5ee;
 }
 
 html,
@@ -105,7 +138,7 @@ table.rank tr:hover td {
 }
 .narrative p {
   margin: 0.55rem 0;
-  color: #cdd9e8;
+  color: var(--text-soft);
   line-height: 1.65;
 }
 .narrative ul {
@@ -114,7 +147,7 @@ table.rank tr:hover td {
 }
 .narrative li {
   margin: 0.3rem 0;
-  color: #cdd9e8;
+  color: var(--text-soft);
   line-height: 1.6;
 }
 .narrative strong {
@@ -145,7 +178,7 @@ table.rank tr:hover td {
   inset: 3px;
   border-radius: 999px;
   background: #ff5148;
-  border: 1.5px solid #0d1620;
+  border: 1.5px solid var(--map-ocean);
 }
 .radar-marker .ring {
   position: absolute;
@@ -178,3 +211,8 @@ table.rank tr:hover td {
 @media (prefers-reduced-motion: reduce) {
   .bar-grow { animation: none; }
 }
+
+/* Theme toggle: CSS picks the icon so server and client markup match. */
+.theme-icon-light { display: none; }
+html[data-theme="light"] .theme-icon-light { display: block; }
+html[data-theme="light"] .theme-icon-dark { display: none; }

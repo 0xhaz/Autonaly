@@ -61,7 +61,7 @@ export default function HistoricalRhymes({
                 {e.year_end === null ? "–" : e.year_end !== e.year_start ? `–${e.year_end}` : ""}
               </span>
             </div>
-            <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "#cdd9e8" }}>
+            <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "var(--text-soft)" }}>
               {e.summary}
             </p>
             <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "var(--muted)" }}>

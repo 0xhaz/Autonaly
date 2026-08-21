@@ -1,14 +1,16 @@
 // Core 3: SignedIn/SignedOut are replaced by <Show when="...">.
 import {
-  ClerkProvider,
   Show,
   SignInButton,
   UserButton,
 } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import Link from "next/link";
+import Script from "next/script";
 
+import Providers from "@/components/Providers";
 import Sidebar from "@/components/Sidebar";
+import ThemeToggle from "@/components/ThemeToggle";
 
 import "./globals.css";
 
@@ -20,7 +22,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the beforeInteractive script stamps data-theme
+    // before hydration, so the attribute legitimately differs from the server
+    // render.
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Served from /vendor alongside the MapLibre bundle. Next would rather
             this went through the bundler, but MapLibre's JS deliberately does
@@ -29,30 +34,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="/vendor/maplibre/maplibre-gl.css" />
       </head>
       <body>
-        <ClerkProvider
-          appearance={{
-            variables: {
-              colorPrimary: "#3987e5",
-              colorBackground: "#121821",
-              colorForeground: "#e6edf6",
-              colorMutedForeground: "#8b9bb4",
-              colorInput: "#172030",
-              colorInputForeground: "#e6edf6",
-              // Social buttons and secondary chrome derive from neutral; on a
-              // dark background it must be light or their labels vanish.
-              colorNeutral: "#e6edf6",
-              borderRadius: "8px",
-            },
-            elements: {
-              socialButtonsBlockButton: {
-                background: "#172030",
-                border: "1px solid #223047",
-                color: "#e6edf6",
-              },
-              socialButtonsBlockButtonText: { color: "#e6edf6" },
-            },
-          }}
-        >
+        {/* Stamp the stored theme before hydration so light users never flash
+            dark; Providers re-syncs as a safety net on loads that skip this. */}
+        <Script id="autonaly-theme-init" strategy="beforeInteractive">
+          {'try{if(localStorage.getItem("autonaly-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}'}
+        </Script>
+        <Providers>
         {/* Navigation lives in the sidebar, which belongs to the session:
             signed-out visitors get the atlas edge to edge and find their way
             through the footer links. */}
@@ -70,11 +57,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </span>
                 </Link>
                 <div className="flex items-center gap-4">
+                  <ThemeToggle />
                   <Show when="signed-out">
                     <SignInButton mode="modal">
                       <button
                         className="rounded-md px-3 py-1.5 text-xs font-semibold"
-                        style={{ background: "var(--accent)", color: "#04121f" }}
+                        style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
                       >
                         Sign in
                       </button>
@@ -116,7 +104,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </footer>
           </div>
         </div>
-        </ClerkProvider>
+        </Providers>
       </body>
     </html>
   );

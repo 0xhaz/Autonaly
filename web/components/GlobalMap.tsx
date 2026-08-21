@@ -27,9 +27,14 @@ const MAPLIBRE_URL = "/vendor/maplibre/maplibre-gl.mjs";
 // rectangle. Land now sits several steps above the water, and the water sits a
 // step above the page, so the frame has depth without any of it competing with
 // the interaction colours.
-const OCEAN = "#0d1620";
-const NEUTRAL = "#27384c";
-const BORDER = "#42586e";
+// MapLibre cannot read CSS variables, so theme tokens are resolved at init;
+// a theme change bumps themeVersion and rebuilds the map with fresh values.
+const cssColor = (name: string, fallback: string): string => {
+  if (typeof window === "undefined") return fallback;
+  return (
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+  );
+};
 const HOVER = "#3987e5";
 const SELECTED = "#1c5cab";
 
@@ -68,6 +73,15 @@ export default function GlobalMap({
 
   const [overlays, setOverlays] = useState<Record<string, unknown> | null>(null);
 
+  // Rebuild on theme switch: cheapest correct answer to MapLibre's inability
+  // to read CSS variables.
+  const [themeVersion, setThemeVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setThemeVersion((v) => v + 1);
+    window.addEventListener("autonaly-theme", bump);
+    return () => window.removeEventListener("autonaly-theme", bump);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -98,6 +112,14 @@ export default function GlobalMap({
         /* webpackIgnore: true */ /* turbopackIgnore: true */ MAPLIBRE_URL
       );
       if (disposed || !container.current || map.current) return;
+
+      const OCEAN = cssColor("--map-ocean", "#0d1620");
+      const NEUTRAL = cssColor("--map-land", "#27384c");
+      const BORDER = cssColor("--map-border", "#42586e");
+      const LANE = cssColor("--map-lane-2", "#a8c8ea");
+      const HOVER_OUTLINE = cssColor("--map-lane", "#cfe2fb");
+      const PORT = cssColor("--map-port", "#7fb2e8");
+      const AMBER = cssColor("--warn", "#e8a33d");
 
       const style = {
         version: 8,
@@ -132,7 +154,7 @@ export default function GlobalMap({
             type: "line",
             source: "world",
             paint: {
-              "line-color": "#cfe2fb",
+              "line-color": HOVER_OUTLINE,
               "line-width": [
                 "case",
                 ["boolean", ["feature-state", "hover"], false],
@@ -156,7 +178,7 @@ export default function GlobalMap({
             paint: {
               // Lanes have to read over both ocean and land, and at 0.5 opacity
               // over dark water they effectively vanished.
-              "line-color": "#a8c8ea",
+              "line-color": LANE,
               "line-width": 0.8,
               "line-opacity": 0.75,
               // Dotted, because these are indicative lanes rather than surveyed
@@ -179,7 +201,7 @@ export default function GlobalMap({
                 20000, 3.4,
                 120000, 6,
               ],
-              "circle-color": "#7fb2e8",
+              "circle-color": PORT,
               "circle-opacity": 0.85,
               "circle-stroke-width": 0.5,
               "circle-stroke-color": OCEAN,
@@ -199,7 +221,7 @@ export default function GlobalMap({
               "circle-radius": 5.5,
               "circle-color": "rgba(0,0,0,0)",
               "circle-stroke-width": 1.6,
-              "circle-stroke-color": "#e8a33d",
+              "circle-stroke-color": AMBER,
               "circle-opacity": 1,
             },
           },
@@ -304,7 +326,7 @@ export default function GlobalMap({
       map.current = null;
     };
      
-  }, [world, overlays]);
+  }, [world, overlays, themeVersion]);
 
   useEffect(() => {
     const m = map.current;

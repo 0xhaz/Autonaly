@@ -54,9 +54,15 @@ const RAMP_COLORS = ["#4575b4", "#91bfdb", "#ffe090", "#fc8d59", "#d73027"];
 // unranked countries read as *more* prominent than genuinely low-scoring ones,
 // inverting the meaning. So hue carries the distinction: grey means "not ranked",
 // blue is reserved for magnitude, and lightness varies only within the blue.
-const OCEAN = "#0d1620";
-const UNSCORED = "#333b44";
-const BORDER = "#4a5866";
+// MapLibre cannot read CSS variables; tokens resolve at init and the map
+// rebuilds on theme change (themeVersion in the init effect deps).
+const cssColor = (name: string, fallback: string): string => {
+  if (typeof window === "undefined") return fallback;
+  return (
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+  );
+};
+
 
 // Never stretch a trivial range into a full-spectrum map.
 const MIN_DOMAIN = 5;
@@ -117,6 +123,13 @@ export default function ExposureMap({
     };
   }, []);
 
+  const [themeVersion, setThemeVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setThemeVersion((v) => v + 1);
+    window.addEventListener("autonaly-theme", bump);
+    return () => window.removeEventListener("autonaly-theme", bump);
+  }, []);
+
   useEffect(() => {
     if (!container.current || !world || map.current) return;
     let disposed = false;
@@ -129,6 +142,15 @@ export default function ExposureMap({
         /* webpackIgnore: true */ /* turbopackIgnore: true */ MAPLIBRE_URL
       );
       if (disposed || !container.current || map.current) return;
+
+    const OCEAN = cssColor("--map-ocean", "#0d1620");
+    const UNSCORED = cssColor("--map-unscored", "#333b44");
+    const AMBER = cssColor("--warn", "#e8a33d");
+    const BORDER = cssColor("--map-border", "#4a5866");
+    const HOVER_OUTLINE = cssColor("--map-lane", "#cfe2fb");
+    // "Largest value at risk" outline: maximum contrast against the fill in
+    // either theme.
+    const LARGEST = cssColor("--text", "#ffffff");
 
     const scores = new Map(affected.map((a) => [a.country, a.score ?? 0]));
     const maxScore = Math.max(0, ...affected.map((a) => a.score ?? 0));
@@ -181,7 +203,7 @@ export default function ExposureMap({
           type: "line",
           source: "world",
           paint: {
-            "line-color": "#cfe2fb",
+            "line-color": HOVER_OUTLINE,
             "line-width": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
@@ -203,7 +225,7 @@ export default function ExposureMap({
                 type: "line",
                 source: "world",
                 filter: ["==", ["get", "iso3"], highlight],
-                paint: { "line-color": "#ffffff", "line-width": 1.6 },
+                paint: { "line-color": LARGEST, "line-width": 1.6 },
               },
             ]
           : []),
@@ -214,7 +236,7 @@ export default function ExposureMap({
           type: "line",
           source: "world",
           filter: ["==", ["get", "iso3"], selected ?? "__none__"],
-          paint: { "line-color": "#e8a33d", "line-width": 2 },
+          paint: { "line-color": AMBER, "line-width": 2 },
         },
       ],
     };
@@ -302,7 +324,7 @@ export default function ExposureMap({
     // briefing and do not change while this page is mounted, so rebuilding the
     // map on their identity would only reintroduce the teardown race.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [world]);
+  }, [world, themeVersion]);
 
   useEffect(() => {
     const m = map.current;
@@ -359,7 +381,7 @@ export default function ExposureMap({
             {marker.label}
           </span>
         )}
-        <span>· white outline = largest value at risk</span>
+        <span>· bright outline = largest value at risk</span>
         <span style={{ color: "#e8a33d" }}>· amber = selected</span>
         <span className="ml-auto">click any country to inspect</span>
       </div>
