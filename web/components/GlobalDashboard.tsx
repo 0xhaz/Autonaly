@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import CountryDrawer from "@/components/CountryDrawer";
@@ -20,7 +21,12 @@ const LAYER_META: { key: keyof LayerToggles; label: string; hint: string; swatch
 ];
 
 export default function GlobalDashboard() {
-  const [selected, setSelected] = useState<string | null>(null);
+  // Deep link from the dashboard's watched countries: /?country=EGY opens
+  // the drawer directly.
+  const searchParams = useSearchParams();
+  const [selected, setSelected] = useState<string | null>(
+    () => searchParams.get("country")?.toUpperCase() ?? null,
+  );
   const [layers, setLayers] = useState<LayerToggles>({
     lanes: false,
     ports: false,

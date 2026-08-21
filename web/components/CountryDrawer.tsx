@@ -1,5 +1,6 @@
 "use client";
 
+import { Show, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 
 import { useEffect, useState } from "react";
@@ -231,6 +232,34 @@ export default function CountryDrawer({
       .catch(() => {});
   }, []);
 
+  // Watchlist state: "save for reference" and "watch" are one concept — a
+  // watched country sits on the dashboard and earns proactive notes. 401s
+  // (signed out) simply leave the set empty; the button is auth-gated anyway.
+  const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
+  const [watchBusy, setWatchBusy] = useState(false);
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (body?.profile?.countries) setWatchlist(new Set(body.profile.countries));
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleWatch = async () => {
+    if (!country || watchBusy) return;
+    setWatchBusy(true);
+    const response = await fetch("/api/profile/watch", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ country }),
+    });
+    setWatchBusy(false);
+    if (!response.ok) return;
+    const body = await response.json();
+    setWatchlist(new Set(body.countries));
+  };
+
   const loading = country !== null && profile?.country !== country && error === null;
 
   useEffect(() => {
@@ -319,22 +348,60 @@ export default function CountryDrawer({
         <header className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold leading-tight">
-              {ctx?.name ?? country}
+              {(country && countryNames[country]) ?? ctx?.name ?? country}
             </h2>
             <p className="mono text-[11px]" style={{ color: "var(--muted)" }}>
               {country}
               {ctx?.region ? ` · ${ctx.region}` : ""}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-md px-2 py-1 text-sm"
-            style={{ border: "1px solid var(--line)", color: "var(--muted)" }}
-          >
-            ✕
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Show when="signed-in">
+              <button
+                type="button"
+                onClick={toggleWatch}
+                disabled={watchBusy}
+                title={
+                  country && watchlist.has(country)
+                    ? "On your watchlist — your analyst reads every event against it. Click to remove."
+                    : "Save to your dashboard — your analyst will flag events touching this country."
+                }
+                className="rounded-md px-2.5 py-1 text-xs font-medium"
+                style={
+                  country && watchlist.has(country)
+                    ? {
+                        border: "1px solid color-mix(in srgb, var(--accent) 45%, transparent)",
+                        background: "color-mix(in srgb, var(--accent) 14%, transparent)",
+                        color: "var(--text)",
+                      }
+                    : { border: "1px solid var(--line)", color: "var(--muted)" }
+                }
+              >
+                {country && watchlist.has(country) ? "★ Watching" : "☆ Watch"}
+              </button>
+            </Show>
+            <Show when="signed-out">
+              <SignInButton mode="modal">
+                <button
+                  type="button"
+                  title="Sign in to save this country to your dashboard"
+                  className="rounded-md px-2.5 py-1 text-xs font-medium"
+                  style={{ border: "1px solid var(--line)", color: "var(--muted)" }}
+                >
+                  ☆ Watch
+                </button>
+              </SignInButton>
+            </Show>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="rounded-md px-2 py-1 text-sm"
+              style={{ border: "1px solid var(--line)", color: "var(--muted)" }}
+            >
+              ✕
+            </button>
+          </div>
         </header>
 
         <div className="mt-3 flex gap-1 rounded-md p-0.5" style={{ background: "var(--panel-2)" }}>

@@ -270,8 +270,21 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
           <h1 className="text-xl font-semibold">{profile.analyst_name}</h1>
           <p className="mono mt-1 text-xs" style={{ color: "var(--muted)" }}>
             watching {profile.baskets.length} commodities ·{" "}
-            {profile.countries.map((c) => names[c] ?? c).join(", ") || "no countries"} ·{" "}
-            {profile.chokepoints.join(", ") || "no chokepoints"}
+            {profile.countries.length === 0
+              ? "no countries"
+              : profile.countries.map((c, i) => (
+                  <span key={c}>
+                    {i > 0 && ", "}
+                    <Link
+                      href={`/?country=${c}`}
+                      title="Open in the atlas"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      {names[c] ?? c}
+                    </Link>
+                  </span>
+                ))}{" "}
+            · {profile.chokepoints.join(", ") || "no chokepoints"}
           </p>
         </div>
         <button type="button" onClick={() => setEditing(true)}

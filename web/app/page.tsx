@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import GlobalDashboard from "@/components/GlobalDashboard";
 
 /**
@@ -13,7 +15,10 @@ export default function HomePage() {
           Click any country for its profile · toggle layers for the maritime network
         </p>
       </div>
-      <GlobalDashboard />
+      {/* Suspense: GlobalDashboard reads ?country= via useSearchParams */}
+      <Suspense>
+        <GlobalDashboard />
+      </Suspense>
     </div>
   );
 }
