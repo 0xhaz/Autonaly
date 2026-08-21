@@ -101,7 +101,7 @@ RUSSIA_UKRAINE = Conflict(
         Channel(
             key="fertilizer_squeeze",
             label="Fertilizer squeeze (Russia + Belarus)",
-            transmission="export_restriction",
+            transmission="export restriction",
             sources=("RUS", "BLR"),
             baskets=("nitrogen_fertilizer", "potash", "compound_fertilizer"),
             default_reduction=0.35,

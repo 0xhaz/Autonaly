@@ -116,7 +116,7 @@ export default function BriefingWorkspace({
         />
         <StatTile
           label="Severity"
-          value={rankings.severity_label}
+          value={rankings.severity_label.replace(/_/g, " ")}
           sub={`methodology ${rankings.methodology_version}`}
         />
       </div>
