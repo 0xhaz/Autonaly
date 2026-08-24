@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { addOceanLabels } from "@/lib/oceanLabels";
 
 /**
  * The landing map: a world atlas, nothing more.
@@ -106,6 +107,7 @@ export default function GlobalMap({
   useEffect(() => {
     if (!container.current || !world || !overlays || map.current) return;
     let disposed = false;
+    let disposeLabels: (() => void) | null = null;
 
     (async () => {
       const maplibre: MapLibre = await import(
@@ -251,6 +253,12 @@ export default function GlobalMap({
       map.current = m;
       m.addControl(new maplibre.NavigationControl({ showCompass: false }), "top-right");
 
+      disposeLabels = await addOceanLabels(maplibre, m);
+      if (disposed) {
+        disposeLabels();
+        disposeLabels = null;
+      }
+
       const popup = new maplibre.Popup({ closeButton: false, closeOnMove: true });
 
       const showPopup = (
@@ -322,6 +330,7 @@ export default function GlobalMap({
 
     return () => {
       disposed = true;
+      disposeLabels?.();
       map.current?.remove();
       map.current = null;
     };

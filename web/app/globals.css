@@ -216,3 +216,31 @@ table.rank tr:hover td {
 .theme-icon-light { display: none; }
 html[data-theme="light"] .theme-icon-light { display: block; }
 html[data-theme="light"] .theme-icon-dark { display: none; }
+
+/* Marine labels: DOM markers rather than a MapLibre symbol layer (these maps
+   ship no glyphs). Cartographic convention — spaced small-caps for oceans,
+   quieter italics for seas — and non-interactive so they never eat a click
+   meant for a country. */
+.marine-label {
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  text-align: center;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  text-shadow:
+    0 1px 2px var(--map-ocean),
+    0 -1px 2px var(--map-ocean);
+}
+.marine-ocean {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text) 58%, var(--map-ocean));
+}
+.marine-sea {
+  font-size: 9.5px;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--text) 42%, var(--map-ocean));
+}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { AffectedCountry } from "@/lib/types";
+import { addOceanLabels } from "@/lib/oceanLabels";
 
 /**
  * Exposure choropleth.
@@ -133,6 +134,7 @@ export default function ExposureMap({
   useEffect(() => {
     if (!container.current || !world || map.current) return;
     let disposed = false;
+    let disposeLabels: (() => void) | null = null;
 
     (async () => {
       // Non-literal specifier: a string literal here makes TypeScript try to
@@ -258,6 +260,12 @@ export default function ExposureMap({
 
     m.addControl(new maplibre.NavigationControl({ showCompass: false }), "top-right");
 
+    disposeLabels = await addOceanLabels(maplibre, m);
+    if (disposed) {
+      disposeLabels();
+      disposeLabels = null;
+    }
+
     if (marker) {
       // A DOM marker rather than a symbol layer: CSS animates the radar ping
       // for free, and there is exactly one of these per map.
@@ -317,6 +325,7 @@ export default function ExposureMap({
 
     return () => {
       disposed = true;
+      disposeLabels?.();
       map.current?.remove();
       map.current = null;
     };

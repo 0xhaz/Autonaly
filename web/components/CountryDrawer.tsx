@@ -1,6 +1,6 @@
 "use client";
 
-import { Show, SignInButton } from "@clerk/nextjs";
+import { Show, SignInButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 
 import {
@@ -63,14 +63,18 @@ export default function CountryDrawer({
   // (signed out) simply leave the set empty; the button is auth-gated anyway.
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [watchBusy, setWatchBusy] = useState(false);
+  // Guarded on the session: /api/profile is behind the auth boundary, so a
+  // signed-out fetch redirects to Clerk and logs a CORS failure.
+  const { isSignedIn } = useAuth();
   useEffect(() => {
+    if (!isSignedIn) return;
     fetch("/api/profile")
       .then((r) => (r.ok ? r.json() : null))
       .then((body) => {
         if (body?.profile?.countries) setWatchlist(new Set(body.profile.countries));
       })
       .catch(() => {});
-  }, []);
+  }, [isSignedIn]);
 
   const toggleWatch = async () => {
     if (!country || watchBusy) return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Show, SignInButton } from "@clerk/nextjs";
+import { Show, SignInButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -36,6 +36,8 @@ export default function CountryPage() {
   const [customEligible, setCustomEligible] = useState(false);
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [watchBusy, setWatchBusy] = useState(false);
+  // See CountryDrawer: the profile fetch is session-guarded.
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
     if (!iso3) return;
@@ -61,13 +63,14 @@ export default function CountryPage() {
         ),
       )
       .catch(() => {});
+    if (!isSignedIn) return;
     fetch("/api/profile")
       .then((r) => (r.ok ? r.json() : null))
       .then((body) => {
         if (body?.profile?.countries) setWatchlist(new Set(body.profile.countries));
       })
       .catch(() => {});
-  }, [iso3]);
+  }, [iso3, isSignedIn]);
 
   const toggleWatch = async () => {
     if (!iso3 || watchBusy) return;

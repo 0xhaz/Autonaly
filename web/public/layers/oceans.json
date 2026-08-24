@@ -1,0 +1,31 @@
+{
+  "note": "Curated marine labels for the atlas and report maps. Names follow IHO standard forms. Positions are label anchors chosen for legibility, not centroids. The Pacific carries two anchors because it straddles the antimeridian and the map does not repeat world copies.",
+  "labels": [
+    { "name": "Pacific Ocean", "rank": "ocean", "lat": 8, "lon": -140 },
+    { "name": "Pacific Ocean", "rank": "ocean", "lat": 2, "lon": 168 },
+    { "name": "Atlantic Ocean", "rank": "ocean", "lat": 34, "lon": -42 },
+    { "name": "Atlantic Ocean", "rank": "ocean", "lat": -26, "lon": -16 },
+    { "name": "Indian Ocean", "rank": "ocean", "lat": -26, "lon": 78 },
+    { "name": "Arctic Ocean", "rank": "ocean", "lat": 82, "lon": 0 },
+    { "name": "Southern Ocean", "rank": "ocean", "lat": -62, "lon": 25 },
+
+    { "name": "Mediterranean Sea", "rank": "sea", "lat": 35.2, "lon": 17 },
+    { "name": "Red Sea", "rank": "sea", "lat": 20, "lon": 38.5 },
+    { "name": "Black Sea", "rank": "sea", "lat": 43.3, "lon": 34 },
+    { "name": "Persian Gulf", "rank": "sea", "lat": 27, "lon": 51.5 },
+    { "name": "Gulf of Aden", "rank": "sea", "lat": 12.4, "lon": 48 },
+    { "name": "Arabian Sea", "rank": "sea", "lat": 15, "lon": 63 },
+    { "name": "Bay of Bengal", "rank": "sea", "lat": 15, "lon": 88 },
+    { "name": "South China Sea", "rank": "sea", "lat": 14, "lon": 114 },
+    { "name": "East China Sea", "rank": "sea", "lat": 29, "lon": 125 },
+    { "name": "Sea of Japan", "rank": "sea", "lat": 40, "lon": 135 },
+    { "name": "Caribbean Sea", "rank": "sea", "lat": 14.5, "lon": -75 },
+    { "name": "Gulf of Mexico", "rank": "sea", "lat": 25, "lon": -90 },
+    { "name": "North Sea", "rank": "sea", "lat": 56.5, "lon": 3 },
+    { "name": "Baltic Sea", "rank": "sea", "lat": 58, "lon": 20 },
+    { "name": "Norwegian Sea", "rank": "sea", "lat": 68, "lon": 2 },
+    { "name": "Barents Sea", "rank": "sea", "lat": 74, "lon": 40 },
+    { "name": "Coral Sea", "rank": "sea", "lat": -16, "lon": 152 },
+    { "name": "Tasman Sea", "rank": "sea", "lat": -38, "lon": 160 }
+  ]
+}
