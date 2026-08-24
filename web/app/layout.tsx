@@ -5,8 +5,8 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
-import Script from "next/script";
 
 import Providers from "@/components/Providers";
 import Sidebar from "@/components/Sidebar";
@@ -20,12 +20,16 @@ export const metadata: Metadata = {
     "Autonomous supply-chain crisis analyst. Gemini reasons, a deterministic engine computes, a human approves.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The theme lives in a cookie so the server can render data-theme itself.
+  // A client-side stamp (localStorage + an inline script) either flashes the
+  // wrong theme or mismatches hydration; reading it here makes the served
+  // HTML already correct, with nothing for React to reconcile.
+  const theme =
+    (await cookies()).get("autonaly-theme")?.value === "light" ? "light" : "dark";
+
   return (
-    // suppressHydrationWarning: the beforeInteractive script stamps data-theme
-    // before hydration, so the attribute legitimately differs from the server
-    // render.
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme={theme}>
       <head>
         {/* Served from /vendor alongside the MapLibre bundle. Next would rather
             this went through the bundler, but MapLibre's JS deliberately does
@@ -34,11 +38,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="/vendor/maplibre/maplibre-gl.css" />
       </head>
       <body>
-        {/* Stamp the stored theme before hydration so light users never flash
-            dark; Providers re-syncs as a safety net on loads that skip this. */}
-        <Script id="autonaly-theme-init" strategy="beforeInteractive">
-          {'try{if(localStorage.getItem("autonaly-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}'}
-        </Script>
         <Providers>
         {/* Navigation lives in the sidebar, which belongs to the session:
             signed-out visitors get the atlas edge to edge and find their way

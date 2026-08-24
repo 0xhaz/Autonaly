@@ -54,32 +54,25 @@ const CLERK_APPEARANCE: Record<Theme, object> = {
 };
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  // localStorage is the source of truth; the beforeInteractive script stamps
-  // the attribute pre-paint and this state adopts the same value on mount.
-  const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      return typeof window !== "undefined" &&
-        localStorage.getItem("autonaly-theme") === "light"
-        ? "light"
-        : "dark";
-    } catch {
-      return "dark";
-    }
-  });
+  // The server already rendered <html data-theme>, so the initial state just
+  // adopts it — identical on both sides of hydration.
+  const [theme, setTheme] = useState<Theme>(() =>
+    typeof document !== "undefined" &&
+    document.documentElement.getAttribute("data-theme") === "light"
+      ? "light"
+      : "dark",
+  );
 
   // All side effects live here, outside render and outside the updater: sync
-  // the attribute, persist, and tell the maps (which cannot read CSS
-  // variables) to rebuild — but only when the DOM actually changes.
+  // the attribute, persist the cookie the server reads on the next request,
+  // and tell the maps (which cannot read CSS variables) to rebuild — but only
+  // when the DOM actually changes.
   useEffect(() => {
     const el = document.documentElement;
     const current: Theme = el.getAttribute("data-theme") === "light" ? "light" : "dark";
-    if (theme === "light") el.setAttribute("data-theme", "light");
-    else el.removeAttribute("data-theme");
-    try {
-      localStorage.setItem("autonaly-theme", theme);
-    } catch {
-      // storage unavailable: theme still applies for this page
-    }
+    el.setAttribute("data-theme", theme);
+    // A year, path-wide, lax: this is a display preference, not a credential.
+    document.cookie = `autonaly-theme=${theme}; path=/; max-age=31536000; SameSite=Lax`;
     if (current !== theme) window.dispatchEvent(new Event("autonaly-theme"));
   }, [theme]);
 
