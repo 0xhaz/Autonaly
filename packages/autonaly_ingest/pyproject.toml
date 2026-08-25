@@ -11,6 +11,9 @@ dependencies = [
     "autonaly-agent",
     "httpx>=0.27",
     "tenacity>=9.0",
+    # worker_service.py: Cloud Run requires the worker to answer HTTP.
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
 ]
 
 [build-system]

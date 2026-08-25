@@ -23,11 +23,17 @@ class ArtifactPaths:
 
     @staticmethod
     def build(settings: Settings, version: str, year: int) -> ArtifactPaths:
-        base = (
-            str(settings.artifact_root)
-            if settings.is_local
-            else f"gs://{settings.artifact_bucket}"
-        )
+        # Artifacts are always read as files. Locally that is the repo's
+        # artifacts/ directory; on Cloud Run the same path is a Cloud Storage
+        # volume mount (see scripts/deploy.sh), so the query is byte-identical
+        # in both environments and there is no cloud branch to test separately.
+        #
+        # The gs:// URI is deliberately not used: DuckDB's httpfs authenticates
+        # to GCS only with static HMAC interoperability keys, and trading a
+        # runtime service account for long-lived keys — to read data that is
+        # public domain anyway — is the wrong direction. Verified 2026-08-25:
+        # httpfs against gs:// returns 403 because it requests anonymously.
+        base = str(settings.artifact_root)
         return ArtifactPaths(
             ddr=f"{base}/exposure/{version}/{year}/ddr.parquet",
             hhi=f"{base}/exposure/{version}/{year}/hhi.parquet",
@@ -64,9 +70,13 @@ def country_context(context_path: str) -> dict[str, dict]:
 def _base_connection(version: str, year: int) -> tuple[duckdb.DuckDBPyConnection, ArtifactPaths]:
     settings = get_settings()
     con = duckdb.connect()
-    if not settings.is_local:
+    paths = ArtifactPaths.build(settings, version, year)
+    # Only remote paths need the extension, and INSTALL downloads it on every
+    # cold start — a needless second or two per container when the artifacts
+    # are a mounted filesystem.
+    if paths.ddr.startswith("gs://"):
         con.execute("INSTALL httpfs; LOAD httpfs;")
-    return con, ArtifactPaths.build(settings, version, year)
+    return con, paths
 
 
 def connect(version: str, year: int) -> tuple[duckdb.DuckDBPyConnection, ArtifactPaths]:
@@ -80,7 +90,7 @@ def connect(version: str, year: int) -> tuple[duckdb.DuckDBPyConnection, Artifac
     """
     con, paths = _base_connection(version, year)
     cursor = con.cursor()
-    if not get_settings().is_local:
+    if paths.ddr.startswith("gs://"):
         # Extension loads are per-connection; the cursor needs its own.
         cursor.execute("LOAD httpfs;")
     return cursor, paths

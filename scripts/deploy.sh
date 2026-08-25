@@ -35,7 +35,9 @@ gcloud run deploy autonaly-engine --project="$PROJECT" --region="$REGION" \
   --service-account="$ENGINE_SA" \
   --allow-unauthenticated \
   --memory=2Gi --cpu=2 --min-instances=0 --max-instances=4 \
-  --set-env-vars="AUTONALY_ENV=gcp,AUTONALY_PROJECT_ID=$PROJECT,AUTONALY_ARTIFACT_BUCKET=autonaly-artifacts" \
+  --add-volume=name=artifacts,type=cloud-storage,bucket=autonaly-artifacts,readonly=true \
+  --add-volume-mount=volume=artifacts,mount-path=/artifacts \
+  --set-env-vars="AUTONALY_ENV=gcp,AUTONALY_PROJECT_ID=$PROJECT,AUTONALY_ARTIFACT_ROOT=/artifacts" \
   --quiet
 ENGINE_URL=$(gcloud run services describe autonaly-engine --project="$PROJECT" --region="$REGION" --format="value(status.url)")
 echo "    engine: $ENGINE_URL"
@@ -55,16 +57,16 @@ AGENT_URL=$(gcloud run services describe autonaly-agent --project="$PROJECT" --r
 echo "    agent:  $AGENT_URL"
 
 # --- 3. worker -------------------------------------------------------------
-# A pull subscriber, so it needs an instance that stays alive and keeps its CPU
-# between messages: min-instances=1 with no CPU throttling. Same image as the
-# agent API, different entrypoint.
+# A pull subscriber wrapped in a health server (worker_service.py explains
+# why): Cloud Run requires an HTTP listener, and the loop needs an instance
+# that stays alive and keeps its CPU between messages.
 echo "==> deploying worker"
 gcloud run deploy autonaly-worker --project="$PROJECT" --region="$REGION" \
   --image="$REPO/agent:$TAG" \
   --service-account="$AGENT_SA" \
   --no-allow-unauthenticated \
   --memory=1Gi --cpu=1 --min-instances=1 --max-instances=1 --no-cpu-throttling \
-  --command=python --args=-m,autonaly_ingest.worker \
+  --command=uvicorn --args=autonaly_ingest.worker_service:app,--host,0.0.0.0,--port,8080 \
   --set-env-vars="AUTONALY_ENV=gcp,AUTONALY_PROJECT_ID=$PROJECT,AUTONALY_ENGINE_URL=$ENGINE_URL,AUTONALY_VERTEX_LOCATION=global,AUTONALY_GEMINI_MODEL=gemini-3.7-flash,GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=global" \
   --quiet
 
