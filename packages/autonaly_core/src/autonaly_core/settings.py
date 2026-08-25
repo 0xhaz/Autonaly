@@ -113,9 +113,20 @@ def _load_env_files() -> None:
     and publishing real messages to GCP while the worker listened to the
     emulator. Loading here means importing settings is sufficient.
     """
+    import os
+
     from dotenv import load_dotenv
 
-    for name in (".env.local", ".env.gcp"):
+    # An explicit AUTONALY_ENV in the real environment decides which file to
+    # read. Loading .env.local when the caller asked for gcp would inject
+    # emulator hosts into a cloud-bound process — precisely the misrouting
+    # assert_environment_consistent exists to catch, and better never created.
+    # (Blanking the vars instead does not work: the Google clients test for
+    # presence, not truthiness, and an empty host yields "the target uri is
+    # not valid: dns:///".)
+    explicit = os.environ.get("AUTONALY_ENV")
+    names = (".env.gcp",) if explicit == "gcp" else (".env.local", ".env.gcp")
+    for name in names:
         path = REPO_ROOT / name
         if path.exists():
             load_dotenv(path, override=False)
