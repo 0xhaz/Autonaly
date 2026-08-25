@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  COMMODITY_GROUPS,
+  normaliseStrait,
+  REGION_ORDER,
+  reasonFor,
+  regionFor,
+} from "@/lib/chokepointCuration";
+
 /**
  * Build-your-analyst onboarding.
  *
@@ -64,11 +72,20 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
   const [watched, setWatched] = useState<Set<string>>(new Set(initial?.countries ?? []));
   const [chokes, setChokes] = useState<Set<string>>(new Set(initial?.chokepoints ?? []));
   const [countryQuery, setCountryQuery] = useState("");
+  const [allStraits, setAllStraits] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/meta").then((r) => r.json()).then(setMeta).catch(() => {});
+    fetch("/layers/chokepoints.geo.json")
+      .then((r) => r.json())
+      .then((d) =>
+        setAllStraits(
+          d.features.map((f: { properties: { name: string } }) => f.properties.name),
+        ),
+      )
+      .catch(() => {});
     fetch("/country-names.json")
       .then((r) => r.json())
       .then((names: Record<string, string>) =>
@@ -98,6 +115,16 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
       )
       .slice(0, 6);
   }, [countryQuery, countries, watched]);
+
+  // The atlas draws 28 straits; the engine scores 8. Showing only the scored
+  // ones made the page look thinner than the map for no visible reason — so
+  // the rest appear too, inert, each carrying why it is not modelled.
+  const uncurated = useMemo(() => {
+    const modelled = new Set(
+      (meta?.chokepoints ?? []).map((c) => normaliseStrait(c.label)),
+    );
+    return allStraits.filter((name) => !modelled.has(normaliseStrait(name)));
+  }, [allStraits, meta]);
 
   const toggle = (set: Set<string>, setter: (s: Set<string>) => void, key: string) => {
     const next = new Set(set);
@@ -194,13 +221,28 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
         <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
           Commodities · {baskets.size} watched
         </label>
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {(meta?.baskets ?? []).map((b) => (
-            <button key={b.key} type="button" onClick={() => toggle(baskets, setBaskets, b.key)}
-              className="rounded-full px-2.5 py-1 text-xs" style={chip(baskets.has(b.key))}>
-              {b.label}
-            </button>
-          ))}
+        <div className="space-y-2.5 pt-1">
+          {COMMODITY_GROUPS.map((group) => {
+            const inGroup = (meta?.baskets ?? []).filter(
+              (b) => b.essentiality === group.key,
+            );
+            if (inGroup.length === 0) return null;
+            return (
+              <div key={group.key}>
+                <div className="mb-1 text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+                  {group.label}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {inGroup.map((b) => (
+                    <button key={b.key} type="button" onClick={() => toggle(baskets, setBaskets, b.key)}
+                      className="rounded-full px-2.5 py-1 text-xs" style={chip(baskets.has(b.key))}>
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -240,13 +282,49 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
         <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
           Chokepoints · {chokes.size} watched
         </label>
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {(meta?.chokepoints ?? []).map((c) => (
-            <button key={c.key} type="button" onClick={() => toggle(chokes, setChokes, c.key)}
-              className="rounded-full px-2.5 py-1 text-xs" style={chip(chokes.has(c.key))}>
-              {c.label}
-            </button>
-          ))}
+        <p className="text-[11px]" style={{ color: "var(--muted)" }}>
+          The atlas draws {allStraits.length || 28} straits;{" "}
+          {(meta?.chokepoints ?? []).length} are modelled and watchable. Dashed
+          ones are on the map but not yet scored — hover for why.
+        </p>
+        <div className="space-y-2.5 pt-1">
+          {REGION_ORDER.map((region) => {
+            const modelled = (meta?.chokepoints ?? []).filter(
+              (c) => regionFor(c.label) === region,
+            );
+            const pending = uncurated.filter((name) => regionFor(name) === region);
+            if (modelled.length === 0 && pending.length === 0) return null;
+            return (
+              <div key={region}>
+                <div className="mb-1 text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+                  {region}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {modelled.map((c) => (
+                    <button key={c.key} type="button" onClick={() => toggle(chokes, setChokes, c.key)}
+                      className="rounded-full px-2.5 py-1 text-xs" style={chip(chokes.has(c.key))}>
+                      {c.label}
+                    </button>
+                  ))}
+                  {pending.map((name) => (
+                    <span
+                      key={name}
+                      title={reasonFor(name)}
+                      className="rounded-full px-2.5 py-1 text-xs"
+                      style={{
+                        border: "1px dashed var(--line)",
+                        color: "var(--muted)",
+                        opacity: 0.6,
+                        cursor: "help",
+                      }}
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
