@@ -75,7 +75,7 @@ export default function AboutPage() {
         <h1 className="text-3xl font-semibold leading-tight tracking-tight">
           What happens to the world when physical supply breaks?
         </h1>
-        <p className="text-base leading-relaxed" style={{ color: "#cdd9e8" }}>
+        <p className="text-base leading-relaxed" style={{ color: "var(--text-soft)" }}>
           When a canal is blocked or an export ban lands, someone has to answer who
           gets hurt, and how badly. That answer usually takes an analyst hours of
           assembling trade data by hand — and most published answers are qualitative
@@ -126,8 +126,10 @@ export default function AboutPage() {
           engine ranks who gets hurt, by how much, in dollars. Ask the desk for a
           written read — grounded in a curated century of supply crises, so your
           speculation arrives with its historical reference class: history
-          doesn&apos;t repeat, but it rhymes. Save the scenario to your dashboard
-          and export the brief as Markdown for your own report. Reopening a saved
+          doesn&apos;t repeat, but it rhymes. Save the scenario to your dashboard, and
+          export the brief as Markdown or straight into Google Docs — a
+          formatted document with headings, the exposure table and the
+          provenance footer, ready to edit. Reopening a saved
           scenario replays it on the live engine — the numbers are reproducible,
           not remembered.
         </p>
@@ -198,7 +200,7 @@ export default function AboutPage() {
             <button
               type="button"
               className="rounded-md px-4 py-2 text-sm font-semibold"
-              style={{ background: "var(--accent)", color: "#04121f" }}
+              style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
             >
               Build your analyst
             </button>
