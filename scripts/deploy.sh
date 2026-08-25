@@ -76,6 +76,9 @@ gcloud run deploy autonaly-worker --project="$PROJECT" --region="$REGION" \
 echo "==> building + deploying web"
 CLERK_PK=$(grep -m1 '^NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=' web/.env.local | cut -d= -f2-)
 CLERK_SK=$(grep -m1 '^CLERK_SECRET_KEY=' web/.env.local | cut -d= -f2-)
+# Optional: without these the Docs export hides itself rather than erroring.
+GOOG_ID=$(grep -m1 '^GOOGLE_OAUTH_CLIENT_ID=' web/.env.local | cut -d= -f2- || true)
+GOOG_SECRET=$(grep -m1 '^GOOGLE_OAUTH_CLIENT_SECRET=' web/.env.local | cut -d= -f2- || true)
 gcloud builds submit --project="$PROJECT" --region="$REGION" \
   --config=infra/cloudbuild.web.yaml \
   --substitutions=_TAG="$TAG",_CLERK_PK="$CLERK_PK" .
@@ -84,7 +87,7 @@ gcloud run deploy autonaly-web --project="$PROJECT" --region="$REGION" \
   --service-account="$WEB_SA" \
   --allow-unauthenticated \
   --memory=1Gi --cpu=1 --min-instances=0 --max-instances=4 \
-  --set-env-vars="AUTONALY_PROJECT_ID=$PROJECT,AUTONALY_ENGINE_URL=$ENGINE_URL,AUTONALY_AGENT_API_URL=$AGENT_URL,CLERK_SECRET_KEY=$CLERK_SK" \
+  --set-env-vars="^|^AUTONALY_PROJECT_ID=$PROJECT|AUTONALY_ENGINE_URL=$ENGINE_URL|AUTONALY_AGENT_API_URL=$AGENT_URL|CLERK_SECRET_KEY=$CLERK_SK|GOOGLE_OAUTH_CLIENT_ID=$GOOG_ID|GOOGLE_OAUTH_CLIENT_SECRET=$GOOG_SECRET" \
   --quiet
 WEB_URL=$(gcloud run services describe autonaly-web --project="$PROJECT" --region="$REGION" --format="value(status.url)")
 

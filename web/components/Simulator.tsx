@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import BriefingWorkspace from "@/components/BriefingWorkspace";
+import ExportToDocs from "@/components/ExportToDocs";
 import HistoricalRhymes from "@/components/HistoricalRhymes";
 import { formatKusd, type Rankings } from "@/lib/types";
 
@@ -470,6 +471,41 @@ export default function Simulator() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // What the Google Docs export carries: the scenario's name, and whichever
+  // ranking the run produced.
+  const docsLabel =
+    mode === "conflict"
+      ? (conflictResult?.label ?? "Conflict scenario")
+      : mode === "chokepoint"
+        ? (current?.label ?? "Chokepoint scenario")
+        : `Port of ${currentPort?.name ?? ""}`;
+
+  const docsTable = (() => {
+    const name = (iso3: string) => countryNames[iso3] ?? iso3;
+    if (mode === "conflict" && conflictResult) {
+      return {
+        headers: ["Country", "Total value at risk", "Channels"],
+        rows: conflictResult.combined.slice(0, 15).map((r) => [
+          name(r.country),
+          formatKusd(r.total_value_at_risk_kusd),
+          String(r.channels.length),
+        ]),
+      };
+    }
+    if (rankings) {
+      return {
+        headers: ["Country", "Score", "Dependency", "Value at risk"],
+        rows: rankings.affected.slice(0, 15).map((a) => [
+          name(a.country),
+          a.score?.toFixed(1) ?? "—",
+          a.ddr != null ? `${(a.ddr * 100).toFixed(1)}%` : "—",
+          formatKusd(a.value_at_risk_kusd),
+        ]),
+      };
+    }
+    return undefined;
+  })();
+
   // The desk's-read panel is identical across chokepoint, port, and conflict
   // results — one definition, rendered wherever a result exists.
   const deskPanel = (
@@ -504,6 +540,15 @@ export default function Simulator() {
                   >
                     {copied ? "Copied" : "Copy as Markdown"}
                   </button>
+                )}
+                {brief && (
+                  <ExportToDocs
+                    title={`${docsLabel} — hypothetical scenario`}
+                    subtitle={`Autonaly scenario desk · ${months}-month disruption · every figure engine-verified · this event never happened`}
+                    narrative={brief}
+                    tableCaption="Ranked exposure"
+                    table={docsTable}
+                  />
                 )}
                 <button
                   type="button"

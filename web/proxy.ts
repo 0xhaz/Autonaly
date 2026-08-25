@@ -15,6 +15,8 @@ const isProtected = createRouteMatcher([
   "/api/scenario-brief(.*)",
   "/api/profile(.*)",
   "/api/scenarios(.*)",
+  "/api/google(.*)",
+  "/api/export(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

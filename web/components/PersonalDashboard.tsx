@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import AnalystBuilder from "@/components/AnalystBuilder";
+import GoogleDocsCard from "@/components/GoogleDocsCard";
 import type { Briefing } from "@/lib/types";
 
 /**
@@ -348,6 +349,8 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
           Edit watchlist
         </button>
       </header>
+
+      <GoogleDocsCard />
 
       <WatchedCountries countries={profile.countries} names={names} onChanged={load} />
 
