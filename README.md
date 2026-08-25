@@ -37,54 +37,78 @@ is the only dependency with no local substitute. You can therefore run this on a
 
 ## Architecture
 
-```
-   replay injector                        ┌── 5 failed deliveries ──► signals-dlq
-   (make replay-suez)  ──►  Pub/Sub ──────┤
-                            signals       │
-                                          ▼
-   ┌──────────────────────────────────────────────────────────────────────┐
-   │  worker  (Cloud Run · min-instances 1 · pull subscriber)             │
-   │    Pydantic gate ─► idempotency ledger ─► agent                      │
-   │                                                                      │
-   │    crisis_desk   ADK coordinator on Gemini 3.7 Flash (Vertex)        │
-   │        ├─ energy_analyst                                             │
-   │        ├─ food_security_analyst     ◄── routing IS the decision      │
-   │        └─ tech_supply_analyst                                        │
-   │              │                                                       │
-   │              │  severity  ──► IMF PortWatch observed transits        │
-   │              │  exposure  ──────────────────┐                        │
-   │              │  compose briefing            │  figures injected,     │
-   │              │  submit for review           │  never generated       │
-   └──────────────┼──────────────────────────────┼────────────────────────┘
-                  │                              ▼
-                  │             ┌──────────────────────────────────────┐
-                  │             │  exposure engine  (Cloud Run)        │
-                  │             │  no google-genai in the image        │
-                  │             │  no aiplatform role on its account   │
-                  │             │  score = DDR × HHI × essentiality × s│
-                  │             └──────────────────┬───────────────────┘
-                  ▼                                ▼
-            Firestore                    Parquet artifacts on GCS
-      briefings · profiles ·             mounted as a filesystem
-      saved scenarios · ledger                     ▲
-                  │                                │
-                  ▼                                │
-   ┌───────────────────────────────────┐           │
-   │  review UI  (Cloud Run)           │───────────┘
-   │  atlas · simulator · crisis pages │
-   │  human approves ──► published     │
-   └───────────────┬───────────────────┘
-                   │  Cloud Run ID token
-                   ▼
-   agent API (Cloud Run · private) ──► Vertex
-     personal notes · scenario briefs · historical rhymes
+```mermaid
+flowchart TB
+    subgraph ingest["Ingestion"]
+        INJ["Replay injector<br/><code>make replay-suez</code>"]
+        TOPIC[["Pub/Sub · signals"]]
+        DLQ[["signals-dlq<br/>after 5 delivery attempts"]]
+    end
 
-   MCP server ──► the same engine, exposed as tools for other agents
+    subgraph reasoning["Reasoning · Cloud Run · has google-genai"]
+        WORKER["worker<br/>Pydantic gate → idempotency ledger"]
+        DESK["crisis_desk<br/>ADK coordinator · Gemini 3.7 Flash"]
+        E["energy_analyst"]
+        F["food_security_analyst"]
+        T["tech_supply_analyst"]
+        GUARD{{"provenance guard<br/>every numeral must exist in engine output"}}
+    end
+
+    subgraph deterministic["Computation · Cloud Run · no google-genai, no aiplatform role"]
+        ENGINE["exposure engine<br/>score = DDR × HHI × essentiality × severity"]
+    end
+
+    subgraph data["Data"]
+        GCS[("Parquet artifacts on GCS<br/>mounted as a filesystem")]
+        FS[("Firestore<br/>briefings · profiles · scenarios · ledger")]
+        PW["IMF PortWatch<br/>observed vessel transits"]
+    end
+
+    subgraph surfaces["Surfaces"]
+        UI["review UI · Cloud Run<br/>atlas · simulator · crisis records"]
+        AGENTAPI["agent API · Cloud Run · private<br/>personal notes · scenario briefs"]
+        MCP["MCP server<br/>the engine as tools for other agents"]
+    end
+
+    INJ --> TOPIC --> WORKER
+    WORKER -. "malformed or failing" .-> DLQ
+    WORKER --> DESK
+    DESK -->|routes by event type| E & F & T
+    E & F & T -->|"severity is measured, not assumed"| PW
+    E & F & T --> ENGINE
+    ENGINE --> GCS
+    E & F & T --> GUARD
+    GUARD -->|"passes"| FS
+    GUARD -.->|"rejects → retry with the offending figures"| DESK
+    FS --> UI
+    UI -->|"human approves"| FS
+    UI -->|"Cloud Run ID token"| AGENTAPI
+    UI --> ENGINE
+    MCP --> ENGINE
 ```
 
-The deterministic boundary is enforced three times over: the engine image has no
-`google-genai`, its service account has no `aiplatform` role, and no module imports a
-model client. It cannot call an LLM even if someone wrote the code.
+The deterministic boundary is enforced three times over: the engine image contains no
+`google-genai`, its service account holds no `aiplatform` role, and no module imports a model
+client. It cannot call an LLM even if someone wrote the code that tried.
+
+### Routing is the decision
+
+The agent's one genuinely autonomous choice is which specialist handles a signal, and that
+choice changes which data source is consulted:
+
+```mermaid
+flowchart LR
+    S["signal"] --> C{"classify_event<br/>typed output"}
+    C -->|chokepoint| CP["fetch observed transits<br/>PortWatch"]
+    C -->|export restriction| ER["fetch supplier concentration<br/>world trade shares"]
+    C -->|natural disaster| ND["resolve affected region<br/>to export baskets"]
+    C -->|financial| REF["refuse to score<br/>file curated, unscored,<br/>with the reason quoted"]
+    CP & ER & ND --> X["compute_exposure<br/>deterministic"]
+```
+
+A financial crisis is not a gap in coverage — it is a deliberate refusal. Banking and currency
+crises transmit through capital flows, which customs data cannot see, so the desk files them
+unscored rather than inventing a number.
 
 ### The `local | gcp` seam
 
@@ -157,7 +181,7 @@ rather than guessing.
 ### Tests
 
 ```bash
-make test    # 116 tests
+make test    # 208 tests
 ```
 
 The suite runs offline. Unit tests use in-memory fakes; PortWatch tests read snapshotted
@@ -169,15 +193,34 @@ fixtures; golden-case tests run against built artifacts and skip cleanly when ab
 
 ```
 packages/
-  autonaly_core/       event schema, settings, the three ports, commodity baskets,
-                       chokepoint routing table
+  autonaly_core/       event schema, settings, the three ports, 22 commodity baskets,
+                       chokepoint routing, conflict channels, 118 curated crises
   autonaly_pipeline/   BACI -> DuckDB -> Parquet refinery + quality gates
   autonaly_engine/     deterministic exposure service (FastAPI, no LLM)
-  autonaly_agent/      ADK root agent and typed tools
-  autonaly_ingest/     PortWatch client, replay injector
-web/                   Next.js review UI + MapLibre briefing page
+  autonaly_agent/      ADK coordinator, three specialists, typed tools,
+                       provenance guard, personalisation + scenario briefs
+  autonaly_ingest/     PortWatch client, Pub/Sub topology, worker, replay injector
+  autonaly_mcp/        MCP server — the engine as tools for other agents
+web/                   Next.js UI: atlas, simulator, crisis records, review queue
+infra/                 Dockerfiles and Cloud Build configs for the four services
+scripts/deploy.sh      idempotent cutover: build images, deploy Cloud Run
 tests/golden/          known-history regression suite
 ```
+
+## Stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Agent framework | **Google ADK** (Python) | Coordinator plus three sub-agents; a transfer between them is the routing decision, and it appears in the trace |
+| Model | **Gemini 3.7 Flash** on Vertex AI | Served from the `global` endpoint — 3.x returns 404 in `us-central1` |
+| Compute | **Cloud Run** ×4 | engine (public), agent API (private), worker (always-on subscriber), UI |
+| Messaging | **Pub/Sub** + dead-letter topic | Five delivery attempts, then the DLQ; idempotency keyed on a content hash |
+| State | **Firestore** | Briefings, analyst profiles, saved scenarios, the processed-signal ledger |
+| Artifacts | **GCS**, mounted as a volume | DuckDB reads plain files in both environments — see the seam note above |
+| Analytics | **DuckDB** over Parquet | 11.25M rows scanned in-process; no warehouse to operate |
+| Frontend | **Next.js 16** + **MapLibre GL** | Open-source map, no token fees; vendored dist to avoid a worker/bundler bug |
+| Auth | **Clerk** | Sessions for the personal analyst; Google Docs export uses its own narrow grant |
+| Agent interop | **MCP** | Eight tools over the same engine, so other agents can query it |
 
 ## Status
 
@@ -203,6 +246,8 @@ tests/golden/          known-history regression suite
 | [CEPII BACI](http://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=37) | Bilateral HS6 trade, ~200 countries | Etalab 2.0, attribution required |
 | [IMF PortWatch](https://portwatch.imf.org/) | Chokepoint vessel transits | Free; cite UN Global Platform; IMF PortWatch |
 | [USGS Mineral Commodity Summaries](https://www.usgs.gov/centers/national-minerals-information-center) | Critical-mineral concentration | US Government public domain |
+| [World Bank WDI](https://databank.worldbank.org/source/world-development-indicators) | Country context: population, GDP, income group | CC BY 4.0 |
+| Crisis history (118 events, 1914–2024) | Curated in this repository, reviewed in version control | Facts of record; each entry cites its own account |
 
 Data: BACI/CEPII (Etalab 2.0) · UN Global Platform; IMF PortWatch
 
