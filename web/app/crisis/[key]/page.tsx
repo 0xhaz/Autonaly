@@ -88,7 +88,7 @@ export default function CrisisPage() {
 
       <section className="panel space-y-3 p-5">
         <h2 className="text-sm font-semibold">What happened</h2>
-        <p className="text-sm leading-relaxed" style={{ color: "#cdd9e8" }}>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--text-soft)" }}>
           {report.summary}
         </p>
         <p className="rounded-md p-3 text-sm leading-relaxed" style={{ background: "var(--panel-2)", color: "var(--muted)" }}>
@@ -108,7 +108,7 @@ export default function CrisisPage() {
             {report.outcomes.map((o) => (
               <li key={o.metric} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
                 <span className="font-medium">{o.metric}</span>
-                <span className="text-xs" style={{ color: "#cdd9e8" }}>
+                <span className="text-xs" style={{ color: "var(--text-soft)" }}>
                   {o.move}
                 </span>
                 <span className="mono shrink-0 text-[11px]" style={{ color: "var(--muted)" }}>
@@ -156,7 +156,7 @@ export default function CrisisPage() {
           <Link
             href={`/simulate?custom=${eligible.slice(0, 3).join(",")}`}
             className="rounded-md px-4 py-2 text-sm font-semibold"
-            style={{ background: "var(--accent)", color: "#04121f" }}
+            style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
           >
             Run as a scenario today
           </Link>

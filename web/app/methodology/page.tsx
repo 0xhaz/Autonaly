@@ -51,7 +51,7 @@ export default function MethodologyPage() {
         <h1 className="text-2xl font-semibold leading-tight tracking-tight">
           Every number, traceable to a row and a formula
         </h1>
-        <p className="text-sm leading-relaxed" style={{ color: "#cdd9e8" }}>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--text-soft)" }}>
           Autonaly&apos;s exposure scores are deterministic: the same inputs always
           produce the same outputs, no model in the loop. This page is the whole
           method — including what it deliberately cannot see.
