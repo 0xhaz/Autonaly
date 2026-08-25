@@ -301,43 +301,61 @@ def country_economy(
     question behind it is usually "how much does this matter to them" — which
     needs total trade and the commodity groups that carry it.
     """
+    # Two scans, not forty-four. The original looped a query per basket per
+    # direction, which local SSDs hid and a Cloud Storage mount did not: 6.5s
+    # to open one country drawer. A VALUES mapping joins every basket in one
+    # pass, and the totals query filters to this country instead of summing
+    # CASE expressions across the whole table.
     totals = con.execute(
         f"""
         SELECT
             COALESCE(SUM(CASE WHEN exporter = '{country}' THEN value_kusd END), 0),
             COALESCE(SUM(CASE WHEN importer = '{country}' THEN value_kusd END), 0)
         FROM '{paths.flows}'
+        WHERE exporter = '{country}' OR importer = '{country}'
         """
     ).fetchone()
 
     exports_total, imports_total = float(totals[0]), float(totals[1])
 
-    def basket_split(direction: str) -> list[dict]:
-        column = "exporter" if direction == "exports" else "importer"
-        rows: list[dict] = []
-        for key, codes in basket_codes.items():
-            code_list = ",".join(f"'{c}'" for c in codes)
-            value = con.execute(
-                f"""
-                SELECT COALESCE(SUM(value_kusd), 0) FROM '{paths.flows}'
-                WHERE {column} = '{country}' AND hs6 IN ({code_list})
-                """
-            ).fetchone()[0]
-            if value:
-                rows.append({"basket": key, "value_kusd": round(float(value), 1)})
-        denominator = exports_total if direction == "exports" else imports_total
-        for row in rows:
-            row["share_of_trade"] = (
-                round(row["value_kusd"] / denominator, 4) if denominator else 0.0
-            )
+    mapping_rows = ",".join(
+        f"('{code}','{basket}')"
+        for basket, codes in basket_codes.items()
+        for code in codes
+    )
+    basket_rows = con.execute(
+        f"""
+        WITH mapping(hs6, basket) AS (VALUES {mapping_rows})
+        SELECT
+            m.basket,
+            COALESCE(SUM(CASE WHEN f.exporter = '{country}' THEN f.value_kusd END), 0),
+            COALESCE(SUM(CASE WHEN f.importer = '{country}' THEN f.value_kusd END), 0)
+        FROM '{paths.flows}' f JOIN mapping m USING (hs6)
+        WHERE f.exporter = '{country}' OR f.importer = '{country}'
+        GROUP BY 1
+        """
+    ).fetchall()
+
+    def basket_split(index: int, denominator: float) -> list[dict]:
+        rows = [
+            {
+                "basket": basket,
+                "value_kusd": round(float(row[index]), 1),
+                "share_of_trade": (
+                    round(float(row[index]) / denominator, 4) if denominator else 0.0
+                ),
+            }
+            for basket, *row in ((r[0], r[1], r[2]) for r in basket_rows)
+            if row[index]
+        ]
         rows.sort(key=lambda r: r["value_kusd"], reverse=True)
         return rows[:6]
 
     return {
         "total_exports_kusd": round(exports_total, 1),
         "total_imports_kusd": round(imports_total, 1),
-        "top_export_baskets": basket_split("exports"),
-        "top_import_baskets": basket_split("imports"),
+        "top_export_baskets": basket_split(0, exports_total),
+        "top_import_baskets": basket_split(1, imports_total),
     }
 
 

@@ -38,42 +38,53 @@ is the only dependency with no local substitute. You can therefore run this on a
 ## Architecture
 
 ```
-        signal (GDELT poll, or replay injector)
-                        │
-                   Pub/Sub topic ───────► dead-letter queue
-                        │                  (3 failed Pydantic gates)
-                        ▼
-        ┌───────────────────────────────────────────┐
-        │  ADK agent: crisis_analyst   (Cloud Run)  │
-        │                                           │
-        │   classify_event ──► Gemini, typed output │
-        │         │                                 │
-        │         ├── chokepoint ──► PortWatch      │
-        │         ├── export_restriction ──► USGS   │
-        │         └── natural_disaster ──► region   │
-        │         │                                 │
-        │   compute_exposure ─────────┐             │
-        │   compose_briefing          │  numbers    │
-        │   submit_for_review         │  injected,  │
-        └─────────────────────────────┼──not────────┘
-                        │             │  generated
-                        │             ▼
-                        │   ┌──────────────────────────┐
-                        │   │ exposure engine          │
-                        │   │ (Cloud Run, no LLM)      │
-                        │   │ DDR + HHI + severity     │
-                        │   └───────────┬──────────────┘
-                        │               │
-                        ▼               ▼
-                   Firestore      Parquet artifacts
-                  review queue     (GCS / local fs)
-                        │
-                        ▼
-              Next.js review UI — human approves
-                        │
-                        ▼
-                published briefing + MapLibre exposure map
+   replay injector                        ┌── 5 failed deliveries ──► signals-dlq
+   (make replay-suez)  ──►  Pub/Sub ──────┤
+                            signals       │
+                                          ▼
+   ┌──────────────────────────────────────────────────────────────────────┐
+   │  worker  (Cloud Run · min-instances 1 · pull subscriber)             │
+   │    Pydantic gate ─► idempotency ledger ─► agent                      │
+   │                                                                      │
+   │    crisis_desk   ADK coordinator on Gemini 3.7 Flash (Vertex)        │
+   │        ├─ energy_analyst                                             │
+   │        ├─ food_security_analyst     ◄── routing IS the decision      │
+   │        └─ tech_supply_analyst                                        │
+   │              │                                                       │
+   │              │  severity  ──► IMF PortWatch observed transits        │
+   │              │  exposure  ──────────────────┐                        │
+   │              │  compose briefing            │  figures injected,     │
+   │              │  submit for review           │  never generated       │
+   └──────────────┼──────────────────────────────┼────────────────────────┘
+                  │                              ▼
+                  │             ┌──────────────────────────────────────┐
+                  │             │  exposure engine  (Cloud Run)        │
+                  │             │  no google-genai in the image        │
+                  │             │  no aiplatform role on its account   │
+                  │             │  score = DDR × HHI × essentiality × s│
+                  │             └──────────────────┬───────────────────┘
+                  ▼                                ▼
+            Firestore                    Parquet artifacts on GCS
+      briefings · profiles ·             mounted as a filesystem
+      saved scenarios · ledger                     ▲
+                  │                                │
+                  ▼                                │
+   ┌───────────────────────────────────┐           │
+   │  review UI  (Cloud Run)           │───────────┘
+   │  atlas · simulator · crisis pages │
+   │  human approves ──► published     │
+   └───────────────┬───────────────────┘
+                   │  Cloud Run ID token
+                   ▼
+   agent API (Cloud Run · private) ──► Vertex
+     personal notes · scenario briefs · historical rhymes
+
+   MCP server ──► the same engine, exposed as tools for other agents
 ```
+
+The deterministic boundary is enforced three times over: the engine image has no
+`google-genai`, its service account has no `aiplatform` role, and no module imports a
+model client. It cannot call an LLM even if someone wrote the code.
 
 ### The `local | gcp` seam
 
@@ -81,16 +92,21 @@ Three ports, one settings object, one environment variable:
 
 | Concern | `AUTONALY_ENV=local` | `AUTONALY_ENV=gcp` |
 |---|---|---|
-| Artifacts | filesystem, bucket-shaped keys | GCS |
+| Artifacts | filesystem | filesystem — a Cloud Storage volume mount |
 | Signals | Pub/Sub emulator | Pub/Sub + DLQ |
 | Review queue | Firestore emulator | Firestore |
-| Engine + agent | uvicorn / `adk web` | Cloud Run |
+| Engine, agent, worker, UI | uvicorn / `next dev` | Cloud Run |
 | **Gemini** | **real Vertex AI** | **real Vertex AI** |
 
 Pub/Sub and Firestore run *identical client code* in both environments — the emulator
-host variables do the work, so there is no local/cloud fork to drift. Only the artifact
-store has two implementations, and the local key layout mirrors the bucket exactly, which
-makes deployment a copy rather than a migration.
+host variables do the work, so there is no local/cloud fork to drift.
+
+Artifacts ended up with no fork either. The original plan read `gs://` URIs through
+DuckDB's httpfs, but httpfs authenticates to GCS only with static HMAC interoperability
+keys and otherwise requests anonymously (a 403, discovered on the first cloud query).
+Trading a runtime service account for long-lived keys — to read public-domain trade data —
+was the wrong direction, so the bucket mounts into the container instead and the engine
+reads plain files everywhere. The cloud query is byte-identical to the local one.
 
 ---
 
@@ -172,10 +188,13 @@ tests/golden/          known-history regression suite
 | Commodity baskets (22) + chokepoint routing | working |
 | Exposure engine + chokepoint route | working |
 | PortWatch observation + degradation guard | working |
-| ADK agent and tools | in progress |
-| Pub/Sub ingestion + replay injector | in progress |
-| Review UI | not started |
-| GCP deployment | not started — local-first by design |
+| ADK agent, sub-agents, and tools | working |
+| Pub/Sub ingestion, DLQ, replay injector | working |
+| Scenario simulator (chokepoint, port, conflict) | working |
+| Crisis history — 118 curated events, 1914–2024 | working |
+| Review UI, personal analyst, saved scenarios | working |
+| MCP server (engine as agent-queryable tools) | working |
+| GCP deployment | deployed to Cloud Run |
 
 ## Data sources
 
