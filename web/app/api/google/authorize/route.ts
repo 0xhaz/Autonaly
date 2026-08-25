@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
-import { consentUrl, docsConfigured } from "@/lib/googleDocs";
+import { consentUrl, docsConfigured, publicOrigin } from "@/lib/googleDocs";
 
 /** Sends the user to Google's consent screen for the drive.file scope. */
 export async function GET(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!docsConfigured()) {
     return NextResponse.json({ error: "google oauth not configured" }, { status: 503 });
   }
-  const origin = request.nextUrl.origin;
+  const origin = publicOrigin(request);
   // The Clerk user id doubles as CSRF state: the callback checks it against
   // the session, so a code replayed into someone else's browser is rejected.
   return NextResponse.redirect(consentUrl(origin, userId));

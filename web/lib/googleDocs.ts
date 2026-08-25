@@ -31,6 +31,28 @@ function db() {
   return getFirestore();
 }
 
+/**
+ * The public origin, as the browser sees it.
+ *
+ * Cloud Run terminates TLS and proxies to the container, so Next's
+ * `nextUrl.origin` reports the internal bind address — observed sending
+ * `https://0.0.0.0:8080/api/google/callback` as the redirect_uri, which Google
+ * rejects with `invalid_request`. The forwarded headers carry the real host.
+ */
+export function publicOrigin(request: {
+  headers: { get(name: string): string | null };
+  nextUrl: { origin: string };
+}): string {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (!host || host.startsWith("0.0.0.0") || host.startsWith("127.0.0.1")) {
+    return request.nextUrl.origin;
+  }
+  const proto =
+    request.headers.get("x-forwarded-proto") ??
+    (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
 export function redirectUri(origin: string): string {
   return process.env.GOOGLE_OAUTH_REDIRECT_URI ?? `${origin}/api/google/callback`;
 }
