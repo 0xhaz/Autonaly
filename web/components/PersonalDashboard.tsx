@@ -323,9 +323,11 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
             load();
           }}
         />
-        {/* Saved simulator work exists independently of the analyst — a user
-            who speculated before hiring one must still find it here. */}
-        <div className="mx-auto max-w-4xl">
+        {/* Saved work and the Docs connection exist independently of the
+            analyst — someone who speculated, or who wants to export a brief,
+            must still find them before hiring one. */}
+        <div className="mx-auto max-w-4xl space-y-6">
+          <GoogleDocsCard />
           <SavedScenarios />
         </div>
       </div>
