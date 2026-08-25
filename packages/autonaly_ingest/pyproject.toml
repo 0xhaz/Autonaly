@@ -5,6 +5,10 @@ description = "Signal ingestion: PortWatch fetcher, GDELT poll handler, replay i
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "autonaly-core",
+    # worker.py hands accepted signals to the agent. The import is lazy so the
+    # injector stays light, but the dependency is real and the container needs
+    # it declared — locally the whole workspace is installed and hides this.
+    "autonaly-agent",
     "httpx>=0.27",
     "tenacity>=9.0",
 ]

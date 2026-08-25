@@ -1,0 +1,31 @@
+# Builds both service images from one context upload. The engine and agent
+# images are deliberately separate: the engine has no google-genai at all,
+# which is how the deterministic boundary is enforced by packaging rather than
+# by convention.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: engine
+    args:
+      - build
+      - -f
+      - infra/Dockerfile.engine
+      - -t
+      - us-central1-docker.pkg.dev/$PROJECT_ID/autonaly/engine:$_TAG
+      - .
+  - name: gcr.io/cloud-builders/docker
+    id: agent
+    args:
+      - build
+      - -f
+      - infra/Dockerfile.agent
+      - -t
+      - us-central1-docker.pkg.dev/$PROJECT_ID/autonaly/agent:$_TAG
+      - .
+images:
+  - us-central1-docker.pkg.dev/$PROJECT_ID/autonaly/engine:$_TAG
+  - us-central1-docker.pkg.dev/$PROJECT_ID/autonaly/agent:$_TAG
+substitutions:
+  _TAG: v1
+options:
+  machineType: E2_HIGHCPU_8
+timeout: 1800s

@@ -1,0 +1,21 @@
+# Build context hygiene: Cloud Build uploads whatever is not listed here, and
+# the repo carries 300MB of parquet plus node_modules. The images need neither
+# — artifacts are read from GCS at runtime, and the web app builds separately.
+.git/
+.venv/
+# Raw BACI downloads (1.3GB) — the pipeline consumes these locally to produce
+# artifacts/, and neither belongs in an image that reads from GCS.
+data/
+artifacts/
+web/node_modules/
+web/.next/
+web/out/
+node_modules/
+tests/fixtures/baci/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+*.parquet
+.env.local
+.env.gcp

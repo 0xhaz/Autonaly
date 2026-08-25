@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getBriefing } from "@/lib/firestore";
+import { serviceAuthHeaders } from "@/lib/serviceAuth";
 import { getPersonalReport, getProfile, savePersonalReport } from "@/lib/profile";
 
 /**
@@ -42,7 +43,10 @@ export async function POST(request: NextRequest) {
 
   const response = await fetch(`${AGENT_API}/personalize`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(await serviceAuthHeaders(AGENT_API)),
+    },
     body: JSON.stringify({ profile, briefing }),
   });
   if (!response.ok) {

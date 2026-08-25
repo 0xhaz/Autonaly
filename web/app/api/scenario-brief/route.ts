@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
+import { serviceAuthHeaders } from "@/lib/serviceAuth";
+
 /**
  * The desk's read of a user-built hypothetical. Signed-in only: the numbers are
  * free and public (the simulator), the analyst's commentary is the product.
@@ -51,7 +53,10 @@ export async function POST(request: NextRequest) {
   const enriched = await withHistory(scenario, rankings);
   const response = await fetch(`${AGENT_API}/scenario-brief`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(await serviceAuthHeaders(AGENT_API)),
+    },
     body: JSON.stringify({ scenario: enriched, rankings }),
   });
   if (!response.ok) {

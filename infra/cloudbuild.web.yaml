@@ -1,0 +1,21 @@
+# The review UI builds separately from the Python services: it needs the Clerk
+# publishable key inlined at build time, which the service images do not.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - infra/Dockerfile.web
+      - --build-arg
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$_CLERK_PK
+      - -t
+      - us-central1-docker.pkg.dev/$PROJECT_ID/autonaly/web:$_TAG
+      - .
+images:
+  - us-central1-docker.pkg.dev/$PROJECT_ID/autonaly/web:$_TAG
+substitutions:
+  _TAG: v1
+  _CLERK_PK: ""
+options:
+  machineType: E2_HIGHCPU_8
+timeout: 1800s
