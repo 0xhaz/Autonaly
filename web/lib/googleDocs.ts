@@ -18,6 +18,7 @@ import { getFirestore } from "firebase-admin/firestore";
 
 const PROJECT_ID = process.env.AUTONALY_PROJECT_ID ?? "autonaly-hackathon";
 const COLLECTION = "google_tokens";
+const EXPORTS = "google_exports";
 
 export const DOCS_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
@@ -127,6 +128,31 @@ async function accessToken(userId: string): Promise<string | null> {
     grant_type: "refresh_token",
   });
   return tokens.access_token ?? null;
+}
+
+export interface ExportedDoc {
+  title: string;
+  url: string;
+  created_at: string;
+}
+
+/**
+ * Remember what was exported.
+ *
+ * The document lands in the user's Drive, but a link they only ever saw on one
+ * button is a link they have lost — Drive search is a poor substitute for "the
+ * brief I exported on Tuesday". So each export is recorded and listed back.
+ */
+async function recordExport(userId: string, doc: ExportedDoc): Promise<void> {
+  await db().collection(EXPORTS).add({ user_id: userId, ...doc });
+}
+
+export async function listExports(userId: string, limit = 8): Promise<ExportedDoc[]> {
+  const snapshot = await db().collection(EXPORTS).where("user_id", "==", userId).get();
+  return snapshot.docs
+    .map((d) => d.data() as ExportedDoc)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, limit);
 }
 
 // --------------------------------------------------------------------------
@@ -257,7 +283,13 @@ export async function exportToDocs(userId: string, spec: DocSpec): Promise<strin
   if (spec.footer) {
     await appendFooter(token, documentId, spec.footer);
   }
-  return `https://docs.google.com/document/d/${documentId}/edit`;
+  const url = `https://docs.google.com/document/d/${documentId}/edit`;
+  await recordExport(userId, {
+    title: spec.title,
+    url,
+    created_at: new Date().toISOString(),
+  });
+  return url;
 }
 
 /**

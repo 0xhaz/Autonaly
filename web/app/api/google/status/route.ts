@@ -1,14 +1,16 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-import { disconnect, docsConfigured, isConnected } from "@/lib/googleDocs";
+import { disconnect, docsConfigured, isConnected, listExports } from "@/lib/googleDocs";
 
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const connected = docsConfigured() ? await isConnected(userId) : false;
   return NextResponse.json({
     configured: docsConfigured(),
-    connected: docsConfigured() ? await isConnected(userId) : false,
+    connected,
+    exports: connected ? await listExports(userId) : [],
   });
 }
 
