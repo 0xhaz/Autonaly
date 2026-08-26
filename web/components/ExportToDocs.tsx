@@ -28,6 +28,37 @@ export interface AnalogueQuery {
   chokepoints: string[];
 }
 
+/**
+ * Does this PNG actually show anything?
+ *
+ * A WebGL canvas whose drawing buffer was not preserved reads back fully
+ * transparent, and a transparent PNG of map dimensions still compresses to
+ * ~17KB — so a size threshold passes it, and the document gets an empty box
+ * where the map should be. Sampling the alpha channel is the check that
+ * actually distinguishes a picture from nothing.
+ */
+async function hasVisiblePixels(dataUrl: string): Promise<boolean> {
+  const img = await new Promise<HTMLImageElement | null>((resolve) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => resolve(null);
+    el.src = dataUrl;
+  });
+  if (!img?.width || !img.height) return false;
+  const scratch = document.createElement("canvas");
+  scratch.width = img.width;
+  scratch.height = img.height;
+  const ctx = scratch.getContext("2d");
+  if (!ctx) return false;
+  ctx.drawImage(img, 0, 0);
+  const { data } = ctx.getImageData(0, 0, img.width, img.height);
+  // Every 97th pixel: dense enough to find a map, cheap enough to be free.
+  for (let i = 3; i < data.length; i += 4 * 97) {
+    if (data[i] > 10) return true;
+  }
+  return false;
+}
+
 export default function ExportToDocs({
   title,
   subtitle,
@@ -71,7 +102,8 @@ export default function ExportToDocs({
     let mapPng: string | undefined;
     try {
       const canvas = document.querySelector<HTMLCanvasElement>("canvas.maplibregl-canvas");
-      mapPng = canvas?.toDataURL("image/png") ?? undefined;
+      const png = canvas?.toDataURL("image/png");
+      mapPng = png && (await hasVisiblePixels(png)) ? png : undefined;
     } catch {
       mapPng = undefined;
     }

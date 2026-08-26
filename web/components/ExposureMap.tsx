@@ -247,8 +247,12 @@ export default function ExposureMap({
       container: container.current,
       style,
       // Required for canvas export: without it the drawing buffer is cleared
-      // after paint and toDataURL() returns a blank PNG.
-      preserveDrawingBuffer: true,
+      // after paint and toDataURL() returns a fully transparent PNG.
+      //
+      // This has to sit inside canvasContextAttributes. MapLibre moved it there
+      // and ignores a top-level preserveDrawingBuffer without complaining, so
+      // the export silently produced blank images while the option looked set.
+      canvasContextAttributes: { preserveDrawingBuffer: true },
       center: [15, 25],
       zoom: 1.05,
       attributionControl: false,
