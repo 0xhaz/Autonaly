@@ -510,15 +510,48 @@ export default function Simulator() {
 
     const rankingTable = (r: Rankings, limit = 15): DocsBlock => ({
       kind: "table",
-      headers: ["Country", "Score", "Dependency", "Concentration", "Value at risk"],
+      headers: [
+        "Country",
+        "Score",
+        "Dependency",
+        "Concentration",
+        "Value at risk",
+        "% of GDP",
+      ],
       rows: r.affected.slice(0, limit).map((a) => [
         name(a.country),
         a.score?.toFixed(1) ?? "\u2014",
         a.ddr != null ? `${(a.ddr * 100).toFixed(1)}%` : "\u2014",
         a.hhi?.toFixed(3) ?? "\u2014",
         formatKusd(a.value_at_risk_kusd),
+        a.at_risk_pct_gdp != null ? `${a.at_risk_pct_gdp.toFixed(2)}%` : "\u2014",
       ]),
     });
+
+    const contextBlocks = (r: Rankings): DocsBlock[] => {
+      const withGdp = r.affected.filter((a) => a.gdp_usd).slice(0, 10);
+      if (!withGdp.length) return [];
+      return [
+        { kind: "heading", text: "Economic context of the most exposed" },
+        {
+          kind: "paragraphs",
+          italic: true,
+          text: [
+            "The size of each economy carrying the exposure. A dollar figure only becomes a judgement once it is set against the economy absorbing it.",
+          ],
+        },
+        {
+          kind: "table",
+          headers: ["Country", "GDP", "Value at risk", "As % of GDP"],
+          rows: withGdp.map((a) => [
+            name(a.country),
+            a.gdp_usd ? `$${(a.gdp_usd / 1e9).toFixed(0)}bn` : "\u2014",
+            formatKusd(a.value_at_risk_kusd),
+            a.at_risk_pct_gdp != null ? `${a.at_risk_pct_gdp.toFixed(2)}%` : "\u2014",
+          ]),
+        },
+      ];
+    };
 
     const sellSideBlocks = (r: Rankings): DocsBlock[] =>
       r.sources_impact?.length
@@ -617,6 +650,7 @@ export default function Simulator() {
       }
 
       if (currentChannel) {
+        blocks.push(...contextBlocks(currentChannel.rankings));
         blocks.push(...sellSideBlocks(currentChannel.rankings));
         blocks.push(...winnersBlocks(currentChannel.rankings));
       }
@@ -631,6 +665,7 @@ export default function Simulator() {
 
     if (rankings) {
       blocks.push({ kind: "heading", text: "Ranked exposure" }, rankingTable(rankings));
+      blocks.push(...contextBlocks(rankings));
       blocks.push(...sellSideBlocks(rankings));
       blocks.push(...winnersBlocks(rankings));
       if (assumption) {

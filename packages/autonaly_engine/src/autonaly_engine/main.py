@@ -196,6 +196,10 @@ def compute_exposure(request: ExposureRequest) -> Rankings:
     except duckdb.Error as exc:  # pragma: no cover - surfaced as 503 for the agent
         raise HTTPException(status_code=503, detail=f"artifacts unavailable: {exc}") from exc
 
+    _gdp = {
+        iso3: row.get("gdp_usd")
+        for iso3, row in country_context(paths.context).items()
+    }
     affected = [
         AffectedCountry(
             country=importer,
@@ -203,6 +207,14 @@ def compute_exposure(request: ExposureRequest) -> Rankings:
             ddr=round(ddr, 4),
             hhi=round(hhi, 4),
             value_at_risk_kusd=round(ddr * total_kusd, 1),
+            gdp_usd=_gdp.get(importer),
+            # kUSD -> USD before comparing with GDP. A dollar figure only becomes
+            # a judgement once it is sized against the economy carrying it.
+            at_risk_pct_gdp=(
+                round(ddr * total_kusd * 1000 / _gdp[importer] * 100, 3)
+                if _gdp.get(importer)
+                else None
+            ),
             channel=f"import dependency on {'+'.join(sources)}",
             evidence=[
                 f"${ddr * total_kusd / 1e6:,.2f}bn at risk of ${total_kusd / 1e6:,.2f}bn "

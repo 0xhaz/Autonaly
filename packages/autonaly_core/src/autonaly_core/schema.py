@@ -109,6 +109,18 @@ class AffectedCountry(BaseModel):
             "should lead with when a 77%-dependent one imports $5.2bn."
         ),
     )
+    gdp_usd: float | None = Field(
+        default=None,
+        description="World Bank GDP, carried so exposure can be sized against the economy.",
+    )
+    at_risk_pct_gdp: float | None = Field(
+        default=None,
+        description=(
+            "Value at risk as a percentage of GDP. Pure arithmetic on two figures "
+            "already published, and the one that turns a number into a judgement: "
+            "$7.6bn is a rounding error for one economy and a crisis for another."
+        ),
+    )
     channel: str
     evidence: list[str] = Field(default_factory=list)
 

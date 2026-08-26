@@ -191,3 +191,24 @@ class TestTheOtherSide:
     def test_sanctions_channel_hits_the_sanctioned_exporter(self, result):
         impact = channel(result, "russia_sanctions")["rankings"]["sources_impact"]
         assert any(s["country"] == "RUS" for s in impact)
+
+
+class TestEconomicContext:
+    """A dollar figure only becomes a judgement once it is sized against the
+    economy carrying it."""
+
+    def test_exposure_is_sized_against_gdp(self, result):
+        affected = channel(result, "ukraine_collapse")["rankings"]["affected"]
+        sized = [a for a in affected if a.get("at_risk_pct_gdp") is not None]
+        assert sized, "the ranking must carry GDP context where it exists"
+        for a in sized:
+            assert a["gdp_usd"] > 0
+            # Sanity: a single commodity basket is never most of an economy.
+            assert 0 < a["at_risk_pct_gdp"] < 100
+
+    def test_percentage_matches_the_two_published_figures(self, result):
+        for a in channel(result, "ukraine_collapse")["rankings"]["affected"]:
+            if a.get("at_risk_pct_gdp") is None:
+                continue
+            expected = a["value_at_risk_kusd"] * 1000 / a["gdp_usd"] * 100
+            assert abs(a["at_risk_pct_gdp"] - expected) < 0.01

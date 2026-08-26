@@ -58,6 +58,16 @@ export const GLOSSARY: GlossaryEntry[] = [
       "orderings are reported because reading only one produces a misleading brief.",
   },
   {
+    term: "% of GDP",
+    short: "Value at risk against the size of the economy carrying it.",
+    full:
+      "The value at risk expressed as a share of the country's GDP (World Bank, " +
+      "latest year). Two figures already published, divided — and the one that " +
+      "turns a dollar amount into a judgement: $7.6bn is 1.96% of Egypt's economy " +
+      "and a rounding error against Germany's. It sizes the shock; it does not " +
+      "predict the response.",
+  },
+  {
     term: "Largest absolute",
     short: "The country losing the most money, regardless of proportion.",
     full:

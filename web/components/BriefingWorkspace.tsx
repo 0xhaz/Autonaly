@@ -229,6 +229,7 @@ export default function BriefingWorkspace({
                 <th title={GLOSSARY_SHORT["Dependency (DDR)"]} style={{ cursor: "help" }}>Dependency ⓘ</th>
                 <th title={GLOSSARY_SHORT["Concentration (HHI)"]} style={{ cursor: "help" }}>Concentration ⓘ</th>
                 <th title={GLOSSARY_SHORT["Value at risk"]} style={{ cursor: "help" }}>Value at risk ⓘ</th>
+                <th title={GLOSSARY_SHORT["% of GDP"]} style={{ cursor: "help" }}>% of GDP ⓘ</th>
               </tr>
             </thead>
             <tbody>
@@ -255,6 +256,9 @@ export default function BriefingWorkspace({
                   <td className="mono">{formatPercent(a.ddr)}</td>
                   <td className="mono">{a.hhi?.toFixed(3) ?? "—"}</td>
                   <td className="mono">{formatKusd(a.value_at_risk_kusd)}</td>
+                  <td className="mono">
+                    {a.at_risk_pct_gdp != null ? `${a.at_risk_pct_gdp.toFixed(2)}%` : "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>

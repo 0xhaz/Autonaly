@@ -15,6 +15,8 @@ export interface AffectedCountry {
   ddr: number | null;
   hhi: number | null;
   value_at_risk_kusd: number | null;
+  gdp_usd?: number | null;
+  at_risk_pct_gdp?: number | null;
   channel: string;
   evidence: string[];
 }
