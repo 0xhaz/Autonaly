@@ -155,7 +155,7 @@ CHOKEPOINTS: tuple[Chokepoint, ...] = (
         # Ukrainian grain entirely, Russian wheat predominantly (Novorossiysk).
         # Romania and Bulgaria have EU land routes, so they are out too.
         source_countries=("RUS", "UKR"),
-        baskets=("wheat", "maize", "barley"),
+        baskets=("wheat", "maize", "barley", "sunflower_oil"),
         reroute=Reroute.NONE,
         importer_filter=None,
         note=(

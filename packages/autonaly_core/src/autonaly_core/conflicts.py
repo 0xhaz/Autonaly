@@ -70,9 +70,8 @@ RUSSIA_UKRAINE = Conflict(
         "Russian pipeline gas is a modelled basket, but no channel here carries "
         "it: the 2022 loss was supplier-side curtailment and damaged "
         "infrastructure, not a coalition embargo, and curtailment is not one of "
-        "the three mechanics above. Also absent: sunflower oil (Ukraine's "
-        "flagship, no basket yet) and neon/noble gases (chip inputs, below HS6 "
-        "resolution)."
+        "the three mechanics above. Still absent: neon and the noble gases "
+        "(chip inputs, below HS6 resolution)."
     ),
     channels=(
         Channel(
@@ -80,7 +79,7 @@ RUSSIA_UKRAINE = Conflict(
             label="Ukraine's exports collapse",
             transmission="blockade + physical destruction",
             sources=("UKR",),
-            baskets=("wheat", "maize", "barley", "iron_ore"),
+            baskets=("wheat", "maize", "barley", "sunflower_oil", "iron_ore"),
             # Seaborne grain fell on this order before the corridor deals;
             # rail "solidarity lanes" carried a fraction.
             default_reduction=0.85,

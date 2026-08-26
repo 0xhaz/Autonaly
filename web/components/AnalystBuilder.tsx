@@ -46,10 +46,10 @@ const TEMPLATES = [
   },
   {
     name: "Food Security Desk",
-    baskets: ["wheat", "maize", "rice", "nitrogen_fertilizer", "potash"],
+    baskets: ["wheat", "maize", "rice", "sunflower_oil", "nitrogen_fertilizer", "potash"],
     chokepoints: ["bosporus", "suez"],
     countries: ["EGY", "TUR", "KEN", "PAK"],
-    watches: "Wheat, maize, rice, fertilizers",
+    watches: "Wheat, maize, rice, sunflower oil, fertilizers",
     via: "Bosporus · Suez",
     where: "Egypt, Turkey, Kenya, Pakistan",
   },

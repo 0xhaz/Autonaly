@@ -115,8 +115,8 @@ food_security_analyst = _specialist(
     ),
     instruction="""You are the desk's food security analyst.
 
-Your baskets: wheat, maize, rice, barley, soybeans, nitrogen_fertilizer,
-potash, phosphate_fertilizer, compound_fertilizer.
+Your baskets: wheat, maize, rice, barley, soybeans, sunflower_oil,
+nitrogen_fertilizer, potash, phosphate_fertilizer, compound_fertilizer.
 Your chokepoint: bosporus.
 
 Domain knowledge that must shape your analysis:

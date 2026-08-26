@@ -83,6 +83,18 @@ BASKETS: tuple[Basket, ...] = (
         codes=("100310", "100390"),
     ),
     Basket(
+        key="sunflower_oil",
+        label="Sunflower and safflower oil",
+        essentiality=Essentiality.STAPLE,
+        codes=("151211", "151219"),
+        note=(
+            "Crude and refined together: the refining split is a processing "
+            "stage, not a different dependency. Ukraine and Russia are 52% of "
+            "world trade between them ($9.7bn of $18.6bn in 2024), which is a "
+            "sharper concentration than any of the grains."
+        ),
+    ),
+    Basket(
         key="soybeans",
         label="Soybeans",
         essentiality=Essentiality.STAPLE,

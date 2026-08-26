@@ -162,7 +162,7 @@ export default function AboutPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">The data, and its limits</h2>
         <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
-          11.25 million bilateral trade rows from CEPII BACI, 23 curated commodity
+          11.25 million bilateral trade rows from CEPII BACI, 24 curated commodity
           baskets, live vessel transits for 28 chokepoints from IMF PortWatch,
           country context from the World Bank, and 88 countries with a large enough
           world-trade position to anchor a custom crisis scenario. Every exposure figure uses latest-year

@@ -115,7 +115,7 @@ briefing. So basket definitions are declared once, validated against the product
 every pipeline run, and shared by every scenario. A basket referencing a non-existent HS6
 code fails the build rather than silently contributing zero.
 
-23 baskets are defined across staples, energy, fertiliser, critical minerals and industrial
+24 baskets are defined across staples, energy, fertiliser, critical minerals and industrial
 inputs. Sanity-checked against known economics: Morocco 42% of phosphates, DR Congo 60% of
 cobalt, Australia 55% of iron ore, Taiwan 24% of semiconductors.
 

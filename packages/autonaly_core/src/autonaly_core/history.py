@@ -1104,6 +1104,7 @@ EVENTS: tuple[CrisisEvent, ...] = (
             "wheat",
             "maize",
             "barley",
+            "sunflower_oil",
             "crude_oil",
             "refined_products",
             "coal",
@@ -1325,7 +1326,7 @@ EVENTS: tuple[CrisisEvent, ...] = (
         "until Ukraine's naval drones reopened a unilateral corridor.",
         "Negotiated corridors through blockades are hostage arrangements — "
         "plan for their collapse from the day they open.",
-        ("wheat", "maize"),
+        ("wheat", "maize", "sunflower_oil"),
         ("bosporus",),
     ),
     CrisisEvent(
