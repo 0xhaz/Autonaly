@@ -96,6 +96,8 @@ export default function Simulator() {
   // A crisis page's "run the modern version" deep link (?custom=RUS,UKR)
   // prefills a custom conflict and runs it once the controls hydrate.
   const searchParams = useSearchParams();
+  // A watched chokepoint on the dashboard links straight here.
+  const chokepointPrefill = searchParams.get("chokepoint") ?? "";
   const customPrefill = (searchParams.get("custom") ?? "")
     .split(",")
     .map((c) => c.trim().toUpperCase())
@@ -106,7 +108,7 @@ export default function Simulator() {
 
   // chokepoint mode
   const [chokepoints, setChokepoints] = useState<ChokepointMeta[]>([]);
-  const [selected, setSelected] = useState<string>("");
+  const [selected, setSelected] = useState<string>(chokepointPrefill);
   const [allStraits, setAllStraits] = useState<string[]>([]);
   const [conflicts, setConflicts] = useState<ConflictMeta[]>([]);
   const [conflictKey, setConflictKey] = useState<string>(customPrefill.length ? "custom" : "");
@@ -134,7 +136,7 @@ export default function Simulator() {
   // A scenario reopened from the dashboard: params are applied to state, the
   // deterministic engine replays the run, and the stored brief (the one thing
   // that cannot be recomputed) is restored after the results land.
-  const autoRunRef = useRef(customPrefill.length > 0);
+  const autoRunRef = useRef(customPrefill.length > 0 || chokepointPrefill.length > 0);
   const savedBriefRef = useRef<string | null>(null);
   // Concurrency guard: StrictMode double-mounts and double-clicks must not
   // issue two engine calls for one intent.
@@ -145,7 +147,7 @@ export default function Simulator() {
       .then((r) => r.json())
       .then((meta) => {
         setChokepoints(meta.chokepoints ?? []);
-        if (meta.chokepoints?.length) setSelected(meta.chokepoints[0].key);
+        if (meta.chokepoints?.length) setSelected((k) => k || meta.chokepoints[0].key);
         setConflicts(meta.conflicts ?? []);
         if (meta.conflicts?.length) setConflictKey((k) => k || meta.conflicts[0].key);
         setCustomCountries(meta.customConflictCountries ?? []);

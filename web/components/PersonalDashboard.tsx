@@ -289,11 +289,20 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
   const [editing, setEditing] = useState(false);
   const [justHired, setJustHired] = useState(false);
   const [names, setNames] = useState<Record<string, string>>({});
+  const [chokeLabels, setChokeLabels] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch("/country-names.json")
       .then((r) => r.json())
       .then(setNames)
+      .catch(() => {});
+    fetch("/api/meta")
+      .then((r) => r.json())
+      .then((meta) => {
+        const map: Record<string, string> = {};
+        for (const c of meta.chokepoints ?? []) map[c.key] = c.label;
+        setChokeLabels(map);
+      })
       .catch(() => {});
   }, []);
 
@@ -342,7 +351,20 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
           <p className="mono mt-1 text-xs" style={{ color: "var(--muted)" }}>
             watching {profile.baskets.length} commodities ·{" "}
             {profile.countries.length} countr{profile.countries.length === 1 ? "y" : "ies"} ·{" "}
-            {profile.chokepoints.join(", ") || "no chokepoints"}
+            {profile.chokepoints.length === 0
+              ? "no chokepoints"
+              : profile.chokepoints.map((k, i) => (
+                  <span key={k}>
+                    {i > 0 && ", "}
+                    <Link
+                      href={`/simulate?chokepoint=${k}`}
+                      title="Simulate a closure here"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      {chokeLabels[k] ?? k}
+                    </Link>
+                  </span>
+                ))}
           </p>
         </div>
         <button type="button" onClick={() => setEditing(true)}
@@ -362,6 +384,15 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
         <h2 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
           Current events · your analyst&apos;s read
         </h2>
+        <p className="-mt-1 text-xs" style={{ color: "var(--muted)" }}>
+          Briefings the desk has filed from incoming signals, each read against
+          your watchlist. To drive a scenario of your own — a strait you watch,
+          a country you suspect — use the{" "}
+          <Link href="/simulate" style={{ color: "var(--accent)" }}>
+            simulator
+          </Link>
+          .
+        </p>
         {briefings.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--muted)" }}>No events on the desk.</p>
         ) : (
