@@ -3,36 +3,66 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { uploadMapImage } from "@/lib/exportImage";
 import { GLOSSARY } from "@/lib/glossary";
-import { type DocSection, type DocSpec, exportToDocs } from "@/lib/googleDocs";
+import { type DocBlock, type DocSpec, exportToDocs } from "@/lib/googleDocs";
 
 /**
  * Turns a desk brief into a Google Doc.
  *
- * The narrative arrives in the desk's own format — `**Section**` markers and
- * paragraphs — so it is parsed back into real headings rather than pasted as
- * one block with asterisks in it. A researcher's export should look written,
- * not dumped.
+ * The caller supplies the scenario-specific body as ordered blocks; the server
+ * owns the parts that must always be present and correct — the narrative
+ * parsed back into real headings, the glossary, and the provenance footer.
  */
 
 const HEADING = /^\*\*(.+?)\*\*\s*(.*)$/;
 
-function parseNarrative(narrative: string): DocSection[] {
-  const sections: DocSection[] = [];
-  let current: DocSection = { paragraphs: [] };
+/** The desk writes `**Section**` markers; a researcher's export should look
+ *  written, not pasted, so they become real headings. */
+function narrativeBlocks(narrative: string): DocBlock[] {
+  const blocks: DocBlock[] = [];
+  let paragraphs: string[] = [];
+  const flush = () => {
+    if (paragraphs.length) blocks.push({ kind: "paragraphs", text: paragraphs });
+    paragraphs = [];
+  };
 
   for (const raw of narrative.split("\n")) {
     const line = raw.trim();
     if (!line) continue;
     const match = line.match(HEADING);
     if (match) {
-      if (current.heading || current.paragraphs.length) sections.push(current);
-      current = { heading: match[1], paragraphs: match[2] ? [match[2]] : [] };
+      flush();
+      blocks.push({ kind: "heading", text: match[1] });
+      if (match[2]) paragraphs.push(match[2]);
     } else {
-      current.paragraphs.push(line.replace(/\*\*/g, ""));
+      paragraphs.push(line.replace(/\*\*/g, ""));
     }
   }
-  if (current.heading || current.paragraphs.length) sections.push(current);
-  return sections;
+  flush();
+  return blocks;
+}
+
+function sanitiseBlocks(input: unknown): DocBlock[] {
+  if (!Array.isArray(input)) return [];
+  const out: DocBlock[] = [];
+  for (const raw of input.slice(0, 60)) {
+    const b = raw as Record<string, unknown>;
+    if (b.kind === "heading" && typeof b.text === "string") {
+      out.push({ kind: "heading", text: b.text.slice(0, 200) });
+    } else if (b.kind === "paragraphs" && Array.isArray(b.text)) {
+      out.push({
+        kind: "paragraphs",
+        text: (b.text as unknown[]).slice(0, 30).map((t) => String(t).slice(0, 2000)),
+        italic: Boolean(b.italic),
+      });
+    } else if (b.kind === "table" && Array.isArray(b.headers) && Array.isArray(b.rows)) {
+      out.push({
+        kind: "table",
+        headers: (b.headers as unknown[]).map(String),
+        rows: (b.rows as unknown[][]).slice(0, 25).map((r) => r.map(String)),
+      });
+    }
+  }
+  return out;
 }
 
 export async function POST(request: NextRequest) {
@@ -45,37 +75,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "narrative required" }, { status: 422 });
   }
 
-  const rawTable = body.table as { headers?: string[]; rows?: string[][] } | undefined;
-  const rawWinners = body.winners as { headers?: string[]; rows?: string[][] } | undefined;
-  const facts = Array.isArray(body.facts)
-    ? (body.facts as { label: string; value: string }[])
-        .slice(0, 6)
-        .map((f) => ({ label: String(f.label), value: String(f.value) }))
-    : undefined;
   const imageUrl = typeof body.mapPng === "string" ? await uploadMapImage(body.mapPng) : null;
+
+  const facts = Array.isArray(body.facts)
+    ? (body.facts as { label: string; value: string }[]).slice(0, 8)
+    : [];
+
+  const blocks: DocBlock[] = [
+    ...(facts.length
+      ? ([
+          { kind: "heading", text: "Key figures" },
+          {
+            kind: "table",
+            headers: ["Measure", "Value"],
+            rows: facts.map((f) => [String(f.label), String(f.value)]),
+          },
+        ] as DocBlock[])
+      : []),
+    ...narrativeBlocks(narrative),
+    ...(imageUrl
+      ? ([
+          { kind: "heading", text: "Exposure map" },
+          {
+            kind: "image",
+            url: imageUrl,
+            caption:
+              "Colour is dependency intensity; the outlined country carries the largest absolute exposure.",
+          },
+        ] as DocBlock[])
+      : []),
+    ...sanitiseBlocks(body.blocks),
+  ];
+
   const spec: DocSpec = {
     title: String(body.title ?? "Autonaly briefing").slice(0, 200),
     subtitle: body.subtitle ? String(body.subtitle).slice(0, 400) : undefined,
-    facts,
-    imageUrl: imageUrl ?? undefined,
-    sections: parseNarrative(narrative),
-    table:
-      rawTable?.headers?.length && rawTable.rows?.length
-        ? {
-            caption: String(body.tableCaption ?? "Ranked exposure"),
-            headers: rawTable.headers.map(String),
-            // Docs tables are for reading, not for scrolling.
-            rows: rawTable.rows.slice(0, 20).map((r) => r.map(String)),
-          }
-        : undefined,
-    winners:
-      rawWinners?.headers?.length && rawWinners.rows?.length
-        ? {
-            caption: "Who benefits",
-            headers: rawWinners.headers.map(String),
-            rows: rawWinners.rows.slice(0, 10).map((r) => r.map(String)),
-          }
-        : undefined,
+    blocks,
     glossary: {
       caption: "How to read these figures",
       headers: ["Term", "What it means"],
@@ -93,8 +128,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url });
   } catch (error) {
     const message = error instanceof Error ? error.message : "export failed";
-    // "not connected" is a normal state, not a server fault — the UI turns it
-    // into a Connect prompt.
     const status = message.includes("not connected") ? 409 : 502;
     return NextResponse.json({ error: message }, { status });
   }

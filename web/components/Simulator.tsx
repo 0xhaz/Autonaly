@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import BriefingWorkspace from "@/components/BriefingWorkspace";
-import ExportToDocs from "@/components/ExportToDocs";
+import ExportToDocs, { type DocsBlock } from "@/components/ExportToDocs";
 import HistoricalRhymes from "@/components/HistoricalRhymes";
 import {
   normaliseStrait,
@@ -496,43 +496,135 @@ export default function Simulator() {
     ];
   })();
 
-  const docsWinners = (() => {
+  /**
+   * The document body, in the order the dashboard presents it.
+   *
+   * A report that stops at the narrative is a transcript. For a conflict the
+   * reader needs the combined table and then each channel with what it stops
+   * and whom it reaches — the whole point of the model being that one war is
+   * several shocks with different reach.
+   */
+  const docsBlocks = (() => {
     const name = (iso3: string) => countryNames[iso3] ?? iso3;
-    const list =
-      mode === "conflict"
-        ? currentChannel?.rankings.winners
-        : rankings?.winners;
-    if (!list?.length) return undefined;
-    return {
-      headers: ["Country", "Why it gains"],
-      rows: list.map((w) => [name(w.country), w.evidence?.[0] ?? w.mechanism]),
-    };
+    const blocks: DocsBlock[] = [];
+
+    const rankingTable = (r: Rankings, limit = 15): DocsBlock => ({
+      kind: "table",
+      headers: ["Country", "Score", "Dependency", "Concentration", "Value at risk"],
+      rows: r.affected.slice(0, limit).map((a) => [
+        name(a.country),
+        a.score?.toFixed(1) ?? "\u2014",
+        a.ddr != null ? `${(a.ddr * 100).toFixed(1)}%` : "\u2014",
+        a.hhi?.toFixed(3) ?? "\u2014",
+        formatKusd(a.value_at_risk_kusd),
+      ]),
+    });
+
+    const winnersBlocks = (r: Rankings): DocsBlock[] =>
+      r.winners?.length
+        ? [
+            { kind: "heading", text: "Who benefits" },
+            {
+              kind: "paragraphs",
+              italic: true,
+              text: [
+                "Substitute exporters with world share and headroom to redirect \u2014 a rendering of existing trade data, not a forecast.",
+              ],
+            },
+            {
+              kind: "table",
+              headers: ["Country", "Why it gains"],
+              rows: r.winners.map((w) => [name(w.country), w.evidence?.[0] ?? w.mechanism]),
+            },
+          ]
+        : [];
+
+    if (mode === "conflict" && conflictResult) {
+      blocks.push(
+        { kind: "heading", text: "Combined exposure across all channels" },
+        {
+          kind: "paragraphs",
+          italic: true,
+          text: ["Dollars at risk summed over every channel that reaches each country."],
+        },
+        {
+          kind: "table",
+          headers: ["Country", "Total value at risk", "Channels reaching it"],
+          rows: conflictResult.combined.slice(0, 15).map((r) => [
+            name(r.country),
+            formatKusd(r.total_value_at_risk_kusd),
+            r.channels
+              .map(
+                (c) =>
+                  conflictResult.channels.find((ch) => ch.key === c.channel)?.label ?? c.channel,
+              )
+              .join("; "),
+          ]),
+        },
+      );
+
+      for (const ch of conflictResult.channels) {
+        blocks.push(
+          { kind: "heading", text: ch.label },
+          {
+            kind: "paragraphs",
+            text: [
+              `${ch.transmission} \u00b7 ${Math.round(ch.effective_reduction * 100)}% reduction \u00b7 ${
+                ch.coalition_only ? "binds coalition importers only" : "hits every importer"
+              }.`,
+              ch.note,
+            ],
+          },
+          {
+            kind: "table",
+            headers: ["Blocked or restricted", "Share of world trade from these origins"],
+            rows: ch.blocked_products.map((b) => [
+              b.label,
+              `${(b.source_world_share * 100).toFixed(1)}%`,
+            ]),
+          },
+          rankingTable(ch.rankings, 10),
+        );
+      }
+
+      if (currentChannel) blocks.push(...winnersBlocks(currentChannel.rankings));
+      if (conflictResult.omissions) {
+        blocks.push(
+          { kind: "heading", text: "Not modelled" },
+          { kind: "paragraphs", text: [conflictResult.omissions] },
+        );
+      }
+      return blocks;
+    }
+
+    if (rankings) {
+      blocks.push({ kind: "heading", text: "Ranked exposure" }, rankingTable(rankings));
+      blocks.push(...winnersBlocks(rankings));
+      if (assumption) {
+        blocks.push(
+          { kind: "heading", text: "Scenario assumption" },
+          { kind: "paragraphs", text: [assumption] },
+        );
+      }
+    }
+    return blocks;
   })();
 
-  const docsTable = (() => {
-    const name = (iso3: string) => countryNames[iso3] ?? iso3;
+  const docsAnalogues = (() => {
     if (mode === "conflict" && conflictResult) {
       return {
-        headers: ["Country", "Total value at risk", "Channels"],
-        rows: conflictResult.combined.slice(0, 15).map((r) => [
-          name(r.country),
-          formatKusd(r.total_value_at_risk_kusd),
-          String(r.channels.length),
-        ]),
+        countries: [...new Set(conflictResult.channels.flatMap((c) => c.sources))],
+        baskets: [...new Set(conflictResult.channels.flatMap((c) => c.rankings.baskets ?? []))],
+        chokepoints: [],
       };
     }
-    if (rankings) {
-      return {
-        headers: ["Country", "Score", "Dependency", "Value at risk"],
-        rows: rankings.affected.slice(0, 15).map((a) => [
-          name(a.country),
-          a.score?.toFixed(1) ?? "—",
-          a.ddr != null ? `${(a.ddr * 100).toFixed(1)}%` : "—",
-          formatKusd(a.value_at_risk_kusd),
-        ]),
-      };
-    }
-    return undefined;
+    if (!rankings) return undefined;
+    return {
+      countries:
+        mode === "port" ? [portCountry, ...(rankings.sources ?? [])] : (rankings.sources ?? []),
+      baskets: rankings.baskets ?? [],
+      chokepoints: mode === "chokepoint" && current ? [current.key] : [],
+    };
   })();
 
   // The desk's-read panel is identical across chokepoint, port, and conflict
@@ -575,10 +667,9 @@ export default function Simulator() {
                     title={`${docsLabel} — hypothetical scenario`}
                     subtitle={`Autonaly scenario desk · ${months}-month disruption · every figure engine-verified · this event never happened`}
                     narrative={brief}
-                    tableCaption="Ranked exposure"
-                    table={docsTable}
                     facts={docsFacts}
-                    winners={docsWinners}
+                    blocks={docsBlocks}
+                    analogues={docsAnalogues}
                   />
                 )}
                 <button

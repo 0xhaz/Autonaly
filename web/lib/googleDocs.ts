@@ -170,25 +170,28 @@ export interface DocTable {
   rows: string[][];
 }
 
+/**
+ * A document is an ordered list of blocks.
+ *
+ * The previous shape had one optional field per section, which meant the
+ * server decided the running order and a scenario with three disruption
+ * channels had nowhere to put them. Blocks let the caller lay out a report of
+ * any length while the server still owns the parts that must not be omitted —
+ * the title, the glossary and the provenance footer.
+ */
+export type DocBlock =
+  | { kind: "heading"; text: string }
+  | { kind: "paragraphs"; text: string[]; italic?: boolean }
+  | { kind: "table"; headers: string[]; rows: string[][] }
+  | { kind: "image"; url: string; caption?: string };
+
 export interface DocSpec {
   title: string;
   subtitle?: string;
-  /** The headline numbers, rendered as a compact two-column table up front —
-   *  a reader who opens the document and reads nothing else should still get
-   *  the four figures that matter. */
-  facts?: { label: string; value: string }[];
-  sections: DocSection[];
-  table?: DocTable;
-  /** Beneficiaries: the other half of any disruption, and the half most
-   *  reports omit. */
-  winners?: DocTable;
-  /** Definitions for every column the reader is about to meet. Always
-   *  included: a ranking is not analysis if the figures are unexplained. */
+  blocks: DocBlock[];
+  /** Always appended, never caller-supplied: a ranking is not analysis if the
+   *  figures are unexplained. */
   glossary?: DocTable;
-  /** A PNG of the exposure map, already uploaded somewhere Google can fetch.
-   *  Additive by contract — if it is missing or fails, the document is still
-   *  complete. */
-  imageUrl?: string;
   footer?: string;
 }
 
@@ -362,55 +365,45 @@ export async function exportToDocs(userId: string, spec: DocSpec): Promise<strin
 
   const head: TextBlock[] = [{ text: spec.title, style: "TITLE" }];
   if (spec.subtitle) head.push({ text: spec.subtitle, style: "SUBTITLE", italic: true });
-  if (spec.facts?.length) head.push({ text: "Key figures", style: "HEADING_1" });
   await appendText(token, documentId, head);
 
-  if (spec.facts?.length) {
-    await appendTable(token, documentId, {
-      headers: ["Measure", "Value"],
-      rows: spec.facts.map((f) => [f.label, f.value]),
-    });
-  }
-
-  const body: TextBlock[] = [];
-  for (const section of spec.sections) {
-    if (section.heading) body.push({ text: section.heading, style: "HEADING_1" });
-    for (const paragraph of section.paragraphs) {
-      if (paragraph.trim()) body.push({ text: paragraph, style: "NORMAL_TEXT" });
+  for (const block of spec.blocks) {
+    switch (block.kind) {
+      case "heading":
+        await appendText(token, documentId, [{ text: block.text, style: "HEADING_1" }]);
+        break;
+      case "paragraphs":
+        await appendText(
+          token,
+          documentId,
+          block.text
+            .filter((t) => t.trim())
+            .map((t) => ({ text: t, style: "NORMAL_TEXT" as const, italic: block.italic })),
+        );
+        break;
+      case "table":
+        if (block.rows.length) {
+          await appendTable(token, documentId, {
+            headers: block.headers,
+            rows: block.rows,
+          });
+        }
+        break;
+      case "image":
+        // Additive by contract: a document without its illustration is still
+        // a complete document, so a failed insert is swallowed.
+        try {
+          await appendImage(token, documentId, block.url);
+          if (block.caption) {
+            await appendText(token, documentId, [
+              { text: block.caption, style: "NORMAL_TEXT", italic: true },
+            ]);
+          }
+        } catch {
+          /* keep going */
+        }
+        break;
     }
-  }
-  await appendText(token, documentId, body);
-
-  if (spec.imageUrl) {
-    try {
-      await appendText(token, documentId, [
-        { text: "Exposure map", style: "HEADING_1" },
-      ]);
-      await appendImage(token, documentId, spec.imageUrl);
-      await appendText(token, documentId, [
-        {
-          text: "Colour is dependency intensity; the outlined country carries the largest absolute exposure.",
-          style: "NORMAL_TEXT",
-          italic: true,
-        },
-      ]);
-    } catch {
-      // Additive by contract — never fail an export over its illustration.
-    }
-  }
-
-  if (spec.table) {
-    await appendText(token, documentId, [
-      { text: spec.table.caption ?? "Ranked exposure", style: "HEADING_1" },
-    ]);
-    await appendTable(token, documentId, spec.table);
-  }
-
-  if (spec.winners?.rows.length) {
-    await appendText(token, documentId, [
-      { text: spec.winners.caption ?? "Who benefits", style: "HEADING_1" },
-    ]);
-    await appendTable(token, documentId, spec.winners);
   }
 
   if (spec.glossary?.rows.length) {

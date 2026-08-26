@@ -15,6 +15,19 @@ export interface DocsTable {
   rows: string[][];
 }
 
+export type DocsBlock =
+  | { kind: "heading"; text: string }
+  | { kind: "paragraphs"; text: string[]; italic?: boolean }
+  | { kind: "table"; headers: string[]; rows: string[][] };
+
+/** Params for the historical reference class, fetched at export time so the
+ *  document carries the same rhymes the page showed. */
+export interface AnalogueQuery {
+  countries: string[];
+  baskets: string[];
+  chokepoints: string[];
+}
+
 export default function ExportToDocs({
   title,
   subtitle,
@@ -22,7 +35,8 @@ export default function ExportToDocs({
   table,
   tableCaption,
   facts,
-  winners,
+  blocks,
+  analogues,
 }: {
   title: string;
   subtitle?: string;
@@ -30,7 +44,8 @@ export default function ExportToDocs({
   table?: DocsTable;
   tableCaption?: string;
   facts?: { label: string; value: string }[];
-  winners?: DocsTable;
+  blocks?: DocsBlock[];
+  analogues?: AnalogueQuery;
 }) {
   const [state, setState] = useState<"loading" | "off" | "disconnected" | "ready">("loading");
   const [busy, setBusy] = useState(false);
@@ -60,10 +75,54 @@ export default function ExportToDocs({
     } catch {
       mapPng = undefined;
     }
+    // The historical reference class is fetched rather than passed down: the
+    // page renders it in its own component, and the document should carry the
+    // same evidence rather than a second, drifting copy.
+    const composed: DocsBlock[] = [...(blocks ?? [])];
+    if (analogues) {
+      try {
+        const params = new URLSearchParams({
+          countries: analogues.countries.join(","),
+          baskets: analogues.baskets.join(","),
+          chokepoints: analogues.chokepoints.join(","),
+        });
+        const rows = await fetch(`/api/analogues?${params}`)
+          .then((r) => (r.ok ? r.json() : { analogues: [] }))
+          .then((d) => d.analogues ?? []);
+        if (rows.length) {
+          composed.push(
+            { kind: "heading", text: "Historical rhymes" },
+            {
+              kind: "paragraphs",
+              italic: true,
+              text: [
+                "Past crises sharing this scenario's geography or commodities, curated from a century of record. The reference class, not a forecast.",
+              ],
+            },
+            {
+              kind: "table",
+              headers: ["Crisis", "Years", "What it teaches"],
+              rows: rows.map((e: { title: string; year_start: number; year_end: number | null; rhyme: string }) => [
+                e.title,
+                e.year_end === null
+                  ? `${e.year_start}–`
+                  : e.year_end !== e.year_start
+                    ? `${e.year_start}–${e.year_end}`
+                    : String(e.year_start),
+                e.rhyme,
+              ]),
+            },
+          );
+        }
+      } catch {
+        // The document is complete without its reference class.
+      }
+    }
+
     const response = await fetch("/api/export/docs", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title, subtitle, narrative, table, tableCaption, facts, winners, mapPng }),
+      body: JSON.stringify({ title, subtitle, narrative, facts, blocks: composed, mapPng }),
     });
     setBusy(false);
     if (response.status === 409) return setState("disconnected");
