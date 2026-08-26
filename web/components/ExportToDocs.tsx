@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { hasVisiblePixels, mapCanvas } from "@/lib/canvasCapture";
+
 /**
  * Export a desk brief to Google Docs.
  *
@@ -18,7 +20,10 @@ export interface DocsTable {
 export type DocsBlock =
   | { kind: "heading"; text: string }
   | { kind: "paragraphs"; text: string[]; italic?: boolean }
-  | { kind: "table"; headers: string[]; rows: string[][] };
+  | { kind: "table"; headers: string[]; rows: string[][] }
+  // `data` is a PNG data URL captured from the page; the route uploads it and
+  // swaps in a fetchable URL, because Google fetches inline images itself.
+  | { kind: "image"; data: string; caption?: string };
 
 /** Params for the historical reference class, fetched at export time so the
  *  document carries the same rhymes the page showed. */
@@ -26,37 +31,6 @@ export interface AnalogueQuery {
   countries: string[];
   baskets: string[];
   chokepoints: string[];
-}
-
-/**
- * Does this PNG actually show anything?
- *
- * A WebGL canvas whose drawing buffer was not preserved reads back fully
- * transparent, and a transparent PNG of map dimensions still compresses to
- * ~17KB — so a size threshold passes it, and the document gets an empty box
- * where the map should be. Sampling the alpha channel is the check that
- * actually distinguishes a picture from nothing.
- */
-async function hasVisiblePixels(dataUrl: string): Promise<boolean> {
-  const img = await new Promise<HTMLImageElement | null>((resolve) => {
-    const el = new Image();
-    el.onload = () => resolve(el);
-    el.onerror = () => resolve(null);
-    el.src = dataUrl;
-  });
-  if (!img?.width || !img.height) return false;
-  const scratch = document.createElement("canvas");
-  scratch.width = img.width;
-  scratch.height = img.height;
-  const ctx = scratch.getContext("2d");
-  if (!ctx) return false;
-  ctx.drawImage(img, 0, 0);
-  const { data } = ctx.getImageData(0, 0, img.width, img.height);
-  // Every 97th pixel: dense enough to find a map, cheap enough to be free.
-  for (let i = 3; i < data.length; i += 4 * 97) {
-    if (data[i] > 10) return true;
-  }
-  return false;
 }
 
 export default function ExportToDocs({
@@ -68,6 +42,7 @@ export default function ExportToDocs({
   facts,
   blocks,
   analogues,
+  captureMaps,
 }: {
   title: string;
   subtitle?: string;
@@ -75,8 +50,12 @@ export default function ExportToDocs({
   table?: DocsTable;
   tableCaption?: string;
   facts?: { label: string; value: string }[];
-  blocks?: DocsBlock[];
+  // A function when the document needs a map per channel: it receives the
+  // captured images keyed by channel and places them itself.
+  blocks?: DocsBlock[] | ((maps: Record<string, string>) => DocsBlock[]);
   analogues?: AnalogueQuery;
+  /** Walk the scenario's channels, capturing each one's map. */
+  captureMaps?: () => Promise<Record<string, string>>;
 }) {
   const [state, setState] = useState<"loading" | "off" | "disconnected" | "ready">("loading");
   const [busy, setBusy] = useState(false);
@@ -99,18 +78,26 @@ export default function ExportToDocs({
     // The exposure map is on the page as a WebGL canvas; grab it so the
     // document carries the picture and not just the numbers. Best effort —
     // if the canvas is absent or unreadable the export proceeds without it.
+    // A conflict is several disruptions at once and one map cannot show them
+    // all, so the caller supplies a way to walk the channels and we capture one
+    // map each. Everything else has a single map, taken as it stands.
     let mapPng: string | undefined;
+    let channelMaps: Record<string, string> = {};
     try {
-      const canvas = document.querySelector<HTMLCanvasElement>("canvas.maplibregl-canvas");
-      const png = canvas?.toDataURL("image/png");
-      mapPng = png && (await hasVisiblePixels(png)) ? png : undefined;
+      if (captureMaps) {
+        channelMaps = await captureMaps();
+      } else {
+        const png = mapCanvas()?.toDataURL("image/png");
+        mapPng = png && (await hasVisiblePixels(png)) ? png : undefined;
+      }
     } catch {
-      mapPng = undefined;
+      // Best effort throughout: the document is worth sending without pictures.
     }
     // The historical reference class is fetched rather than passed down: the
     // page renders it in its own component, and the document should carry the
     // same evidence rather than a second, drifting copy.
-    const composed: DocsBlock[] = [...(blocks ?? [])];
+    const resolved = typeof blocks === "function" ? blocks(channelMaps) : blocks;
+    const composed: DocsBlock[] = [...(resolved ?? [])];
     if (analogues) {
       try {
         const params = new URLSearchParams({

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import BriefingWorkspace from "@/components/BriefingWorkspace";
+import { captureMap, mapCanvas } from "@/lib/canvasCapture";
 import ExportToDocs, { type DocsBlock } from "@/components/ExportToDocs";
 import HistoricalRhymes from "@/components/HistoricalRhymes";
 import {
@@ -504,7 +505,43 @@ export default function Simulator() {
    * and whom it reaches — the whole point of the model being that one war is
    * several shocks with different reach.
    */
-  const docsBlocks = (() => {
+  /**
+   * One map per channel, for the exported document.
+   *
+   * The page shows a single map at a time, so the only way to picture every
+   * channel is to walk them: select one, wait for its map, capture, move on,
+   * and put the reader's selection back afterwards. Inspecting a channel
+   * remounts the workspace, so each capture waits for a canvas that isn't the
+   * previous one — polling the element rather than a fixed sleep, because a
+   * sleep either races the remount or wastes the reader's time.
+   *
+   * Any channel whose map does not arrive is simply left without one; the
+   * section still carries its tables.
+   */
+  const captureChannelMaps = async (): Promise<Record<string, string>> => {
+    if (mode !== "conflict" || !conflictResult) return {};
+    const restore = channelKey;
+    const maps: Record<string, string> = {};
+    let previous = mapCanvas();
+    let showing = channelKey;
+
+    for (const ch of conflictResult.channels) {
+      const shot =
+        ch.key === showing
+          ? await captureMap()
+          : (setChannelKey(ch.key), await captureMap({ notCanvas: previous }));
+      showing = ch.key;
+      if (shot) {
+        maps[ch.key] = shot.png;
+        previous = shot.canvas;
+      }
+    }
+
+    if (restore !== showing) setChannelKey(restore);
+    return maps;
+  };
+
+  const docsBlocks = (channelMaps: Record<string, string> = {}) => {
     const name = (iso3: string) => countryNames[iso3] ?? iso3;
     const blocks: DocsBlock[] = [];
 
@@ -625,6 +662,11 @@ export default function Simulator() {
         },
       );
 
+      // Each channel is its own subject. A conflict is several disruptions with
+      // different mechanics, reach and victims, and collapsing them into one
+      // map and one ranking hides exactly what makes them different — so each
+      // gets its own map, its own importers, and its own account of what the
+      // country at the centre of it stops earning.
       for (const ch of conflictResult.channels) {
         blocks.push(
           { kind: "heading", text: ch.label },
@@ -645,14 +687,18 @@ export default function Simulator() {
               `${(b.source_world_share * 100).toFixed(1)}%`,
             ]),
           },
-          rankingTable(ch.rankings, 10),
         );
-      }
-
-      if (currentChannel) {
-        blocks.push(...contextBlocks(currentChannel.rankings));
-        blocks.push(...sellSideBlocks(currentChannel.rankings));
-        blocks.push(...winnersBlocks(currentChannel.rankings));
+        if (channelMaps[ch.key]) {
+          blocks.push({
+            kind: "image",
+            data: channelMaps[ch.key],
+            caption: `${ch.label} — colour is dependency intensity; the outlined country carries the largest absolute exposure.`,
+          });
+        }
+        blocks.push(rankingTable(ch.rankings, 10));
+        blocks.push(...contextBlocks(ch.rankings));
+        blocks.push(...sellSideBlocks(ch.rankings));
+        blocks.push(...winnersBlocks(ch.rankings));
       }
       if (conflictResult.omissions) {
         blocks.push(
@@ -676,7 +722,7 @@ export default function Simulator() {
       }
     }
     return blocks;
-  })();
+  };
 
   const docsAnalogues = (() => {
     if (mode === "conflict" && conflictResult) {
@@ -738,6 +784,7 @@ export default function Simulator() {
                     facts={docsFacts}
                     blocks={docsBlocks}
                     analogues={docsAnalogues}
+                    captureMaps={mode === "conflict" ? captureChannelMaps : undefined}
                   />
                 )}
                 <button

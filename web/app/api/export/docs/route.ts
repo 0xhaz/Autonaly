@@ -41,10 +41,25 @@ function narrativeBlocks(narrative: string): DocBlock[] {
   return blocks;
 }
 
-function sanitiseBlocks(input: unknown): DocBlock[] {
+/**
+ * Blocks arrive from the browser, so nothing here is trusted: unknown kinds are
+ * dropped and every string is length-capped.
+ *
+ * Image blocks are the one kind that cannot be sanitised synchronously — they
+ * carry captured pixels that have to be uploaded somewhere Google can fetch
+ * them anonymously — so they are marked here and resolved in a second pass.
+ */
+interface PendingImage {
+  kind: "pending-image";
+  data: string;
+  caption?: string;
+}
+
+function sanitiseBlocks(input: unknown): (DocBlock | PendingImage)[] {
   if (!Array.isArray(input)) return [];
-  const out: DocBlock[] = [];
-  for (const raw of input.slice(0, 60)) {
+  const out: (DocBlock | PendingImage)[] = [];
+  // A conflict runs three channels, each with a map and four tables.
+  for (const raw of input.slice(0, 140)) {
     const b = raw as Record<string, unknown>;
     if (b.kind === "heading" && typeof b.text === "string") {
       out.push({ kind: "heading", text: b.text.slice(0, 200) });
@@ -60,7 +75,38 @@ function sanitiseBlocks(input: unknown): DocBlock[] {
         headers: (b.headers as unknown[]).map(String),
         rows: (b.rows as unknown[][]).slice(0, 25).map((r) => r.map(String)),
       });
+    } else if (b.kind === "image" && typeof b.data === "string") {
+      out.push({
+        kind: "pending-image",
+        data: b.data,
+        caption: typeof b.caption === "string" ? b.caption.slice(0, 400) : undefined,
+      });
     }
+  }
+  return out;
+}
+
+/** Upload every captured map at once and drop the ones that do not land. */
+async function resolveImages(blocks: (DocBlock | PendingImage)[]): Promise<DocBlock[]> {
+  const uploads = new Map<string, Promise<string | null>>();
+  for (const b of blocks) {
+    if (b.kind === "pending-image" && !uploads.has(b.data)) {
+      uploads.set(b.data, uploadMapImage(b.data));
+    }
+  }
+  const urls = new Map<string, string | null>(
+    await Promise.all(
+      [...uploads].map(async ([data, p]) => [data, await p] as [string, string | null]),
+    ),
+  );
+  const out: DocBlock[] = [];
+  for (const b of blocks) {
+    if (b.kind !== "pending-image") {
+      out.push(b);
+      continue;
+    }
+    const url = urls.get(b.data);
+    if (url) out.push({ kind: "image", url, caption: b.caption });
   }
   return out;
 }
@@ -104,7 +150,7 @@ export async function POST(request: NextRequest) {
           },
         ] as DocBlock[])
       : []),
-    ...sanitiseBlocks(body.blocks),
+    ...(await resolveImages(sanitiseBlocks(body.blocks))),
   ];
 
   const spec: DocSpec = {
