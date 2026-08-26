@@ -123,6 +123,26 @@ export async function POST(request: NextRequest) {
     ).slice(0, 600),
   };
 
+  // Dry run: return the assembled document instead of writing it. Creates
+  // nothing, costs nothing, and makes "what would this produce" answerable
+  // without a Google account.
+  if (request.nextUrl.searchParams.get("dryrun") === "1") {
+    return NextResponse.json({
+      title: spec.title,
+      blockCount: spec.blocks.length,
+      outline: spec.blocks.map((b) =>
+        b.kind === "heading"
+          ? `H1  ${b.text}`
+          : b.kind === "table"
+            ? `TBL ${b.headers.join(" | ")} (${b.rows.length} rows)`
+            : b.kind === "image"
+              ? `IMG ${b.url}`
+              : `P   ${b.text[0]?.slice(0, 60) ?? ""}`,
+      ),
+      glossaryRows: spec.glossary?.rows.length ?? 0,
+    });
+  }
+
   try {
     const url = await exportToDocs(userId, spec);
     return NextResponse.json({ url });
