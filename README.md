@@ -193,7 +193,7 @@ fixtures; golden-case tests run against built artifacts and skip cleanly when ab
 
 ```
 packages/
-  autonaly_core/       event schema, settings, the three ports, 22 commodity baskets,
+  autonaly_core/       event schema, settings, the three ports, 23 commodity baskets,
                        chokepoint routing, conflict channels, 118 curated crises
   autonaly_pipeline/   BACI -> DuckDB -> Parquet refinery + quality gates
   autonaly_engine/     deterministic exposure service (FastAPI, no LLM)

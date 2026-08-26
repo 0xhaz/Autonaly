@@ -114,7 +114,26 @@ BASKETS: tuple[Basket, ...] = (
         key="lpg",
         label="LPG and other petroleum gases",
         essentiality=Essentiality.ENERGY,
-        codes=("271112", "271113", "271114", "271119", "271121", "271129"),
+        codes=("271112", "271113", "271114", "271119", "271129"),
+        note=(
+            "271121 used to sit here, and at 61% of the basket by value it meant "
+            "an 'LPG' exposure figure was mostly pipeline gas. It has its own "
+            "basket now."
+        ),
+    ),
+    Basket(
+        key="pipeline_gas",
+        label="Pipeline natural gas",
+        essentiality=Essentiality.ENERGY,
+        codes=("271121",),
+        note=(
+            "Natural gas in the gaseous state — gas that arrived by pipe rather "
+            "than by ship. $157.7bn of world trade in 2024, which is why it must "
+            "not be pooled with LPG. Deliberately absent from every maritime "
+            "chokepoint: a pipeline does not transit a strait, so counting it as "
+            "cargo at Hormuz or Malacca overstates them. LNG (271111) is the "
+            "shipped substitute and stays in its own basket."
+        ),
     ),
     Basket(
         key="coal",

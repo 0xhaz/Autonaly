@@ -35,7 +35,7 @@ mcp = MCPServer(
         "supply breaks. Exposure scores come from customs data and a published "
         "formula (DDR x HHI x essentiality x severity) - no model generates "
         "numbers. Exposure only, never probability. Latest-year trade weights, "
-        "first-order effects; 22 commodity baskets."
+        "first-order effects; 23 commodity baskets."
     ),
 )
 
@@ -224,7 +224,7 @@ def methodology() -> str:
         "answer 'where is the global supply impact', not 'who is most "
         "dependent'.\n"
         "Limits, stated on every surface: latest-year weights; first-order "
-        "effects only; no inventories or substitution; only 22 commodity "
+        "effects only; no inventories or substitution; only 23 commodity "
         "baskets visible; financial crises refused (invisible in customs "
         "data); exposure published, probability never."
     )

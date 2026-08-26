@@ -67,9 +67,12 @@ RUSSIA_UKRAINE = Conflict(
         "stylized to the observed 2022-23 pattern."
     ),
     omissions=(
-        "Pipeline gas (not a modelled basket — it dominated EU-Russia energy), "
-        "sunflower oil (Ukraine's flagship, no basket yet), and neon/noble "
-        "gases (chip inputs, below HS6 resolution)."
+        "Russian pipeline gas is a modelled basket, but no channel here carries "
+        "it: the 2022 loss was supplier-side curtailment and damaged "
+        "infrastructure, not a coalition embargo, and curtailment is not one of "
+        "the three mechanics above. Also absent: sunflower oil (Ukraine's "
+        "flagship, no basket yet) and neon/noble gases (chip inputs, below HS6 "
+        "resolution)."
     ),
     channels=(
         Channel(

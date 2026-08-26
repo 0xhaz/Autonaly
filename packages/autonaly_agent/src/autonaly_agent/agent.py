@@ -81,7 +81,7 @@ energy_analyst = _specialist(
     ),
     instruction="""You are the desk's energy analyst.
 
-Your baskets: crude_oil, refined_products, lng, lpg, coal.
+Your baskets: crude_oil, refined_products, lng, lpg, pipeline_gas, coal.
 Your chokepoints: hormuz, suez, malacca, bab_el_mandeb.
 
 Domain knowledge that must shape your analysis:

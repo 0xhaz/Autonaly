@@ -37,10 +37,10 @@ interface Props {
 const TEMPLATES = [
   {
     name: "Energy Desk",
-    baskets: ["crude_oil", "refined_products", "lng", "lpg"],
+    baskets: ["crude_oil", "refined_products", "lng", "lpg", "pipeline_gas"],
     chokepoints: ["hormuz", "suez", "malacca"],
     countries: ["JPN", "KOR", "IND", "CHN"],
-    watches: "Crude, refined products, LNG, LPG",
+    watches: "Crude, refined products, LNG, LPG, pipeline gas",
     via: "Hormuz · Suez · Malacca",
     where: "Japan, South Korea, India, China",
   },

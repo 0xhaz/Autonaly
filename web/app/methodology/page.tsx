@@ -32,7 +32,7 @@ const SIMPLIFICATIONS = [
       "The desk publishes exposure, never likelihood. Hypothetical scenarios open with the word 'Hypothetical' and refuse probability by design; historical probability belongs to the record, not the model.",
   },
   {
-    title: "Only 22 commodity baskets are visible",
+    title: "Only 23 commodity baskets are visible",
     body:
       "Grains, energy, fertilizers, and critical minerals — 72 HS6 codes chosen for supply-shock relevance. Services, autos, machinery and most manufactures are outside the model, so a crisis in a diversified manufacturing economy is understated here.",
   },
