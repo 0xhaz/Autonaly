@@ -382,25 +382,31 @@ export async function exportToDocs(userId: string, spec: DocSpec): Promise<strin
       });
     });
 
+    // Descending, and each header is bolded in the same request stream directly
+    // after its own insert. Every index here came from the read above, so it is
+    // only valid until something is inserted at a lower index — and while
+    // descending, nothing has been. Bolding in a later pass would use indices
+    // that all the fills had since shifted, and bold arbitrary text mid-table.
     fills.sort((a, b) => b.index - a.index);
     if (fills.length) {
       await docsApi(token, `/${documentId}:batchUpdate`, {
-        requests: fills.map((f) => ({
-          insertText: { location: { index: f.index }, text: f.text },
-        })),
-      });
-      const headers = fills.filter((f) => f.header);
-      if (headers.length) {
-        await docsApi(token, `/${documentId}:batchUpdate`, {
-          requests: headers.map((f) => ({
-            updateTextStyle: {
-              range: { startIndex: f.index, endIndex: f.index + f.text.length },
-              textStyle: { bold: true },
-              fields: "bold",
+        requests: fills.flatMap((f) => {
+          const insert = {
+            insertText: { location: { index: f.index }, text: f.text },
+          };
+          if (!f.header) return [insert];
+          return [
+            insert,
+            {
+              updateTextStyle: {
+                range: { startIndex: f.index, endIndex: f.index + f.text.length },
+                textStyle: { bold: true },
+                fields: "bold",
+              },
             },
-          })),
-        });
-      }
+          ];
+        }),
+      });
     }
   }
 
