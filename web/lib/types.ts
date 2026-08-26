@@ -47,6 +47,14 @@ export interface EventDraft {
   confidence: number;
 }
 
+export interface AgentTrail {
+  coordinator: string;
+  specialist: string | null;
+  route: string | null;
+  tools_used: string[];
+  model: string;
+}
+
 export interface Briefing {
   id: string;
   event_key: string;
@@ -57,6 +65,7 @@ export interface Briefing {
   draft: EventDraft;
   rankings: Rankings | null;
   review_note: string | null;
+  trail?: AgentTrail | null;
   created_at: string;
   published_at: string | null;
 }

@@ -22,7 +22,13 @@ function Row({ briefing }: { briefing: Briefing }) {
             <span className="chip" style={{ color: "var(--muted)" }}>{briefing.draft.route}</span>
           )}
         </div>
-        <h3 className="mt-2 text-sm font-semibold">{briefing.title}</h3>
+        {briefing.trail?.specialist && (
+          <p className="mono mt-1.5 text-[11px]" style={{ color: "var(--muted)" }}>
+            crisis_desk →{" "}
+            <span style={{ color: "var(--accent)" }}>{briefing.trail.specialist}</span>
+          </p>
+        )}
+        <h3 className="mt-1.5 text-sm font-semibold">{briefing.title}</h3>
         {r ? (
           <p className="mono mt-1 text-[11px]" style={{ color: "var(--muted)" }}>
             {r.largest_absolute_exposure ?? "—"} largest · {r.affected.length} ranked

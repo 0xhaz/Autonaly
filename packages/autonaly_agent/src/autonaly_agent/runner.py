@@ -117,5 +117,33 @@ async def run_on_signal(signal: Signal, session_id: str | None = None) -> AgentR
             elif getattr(part, "text", None):
                 result.final_text = part.text
 
+    _attach_trail(result)
     log.info("agent run complete: %s", result.summary())
     return result
+
+
+def _attach_trail(result: AgentRun) -> None:
+    """Write the routing decision onto the filed briefing.
+
+    It cannot be part of submit_for_review: the specialist and route are only
+    known once the run has finished, and the tool is called mid-run. Best
+    effort — a briefing is still valid without its trail, so a failure here
+    must not fail the run.
+    """
+    if not result.filed_id:
+        return
+    try:
+        from autonaly_core import build_review_queue, get_settings
+
+        build_review_queue().attach_trail(
+            result.filed_id,
+            {
+                "coordinator": "crisis_desk",
+                "specialist": result.specialist,
+                "route": result.route,
+                "tools_used": list(dict.fromkeys(result.tool_calls)),
+                "model": get_settings().gemini_model,
+            },
+        )
+    except Exception:  # noqa: BLE001 - provenance is additive, never fatal
+        log.warning("could not attach agent trail to %s", result.filed_id, exc_info=True)

@@ -1,3 +1,4 @@
+import AgentTrailStrip from "@/components/AgentTrailStrip";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -87,6 +88,8 @@ export default async function BriefingPage({
           {rankings ? ` · severity: ${rankings.severity_label} · methodology ${rankings.methodology_version}` : ""}
         </p>
       </header>
+
+      <AgentTrailStrip trail={briefing.trail} />
 
       {briefing.review_note && (
         <div

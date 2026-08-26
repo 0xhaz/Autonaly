@@ -29,6 +29,11 @@ class FirestoreReviewQueue:
         self._db.collection(self._collection).document(record.id).set(payload)
         return record.id
 
+    def attach_trail(self, record_id: str, trail: dict) -> None:
+        """Record how the briefing was produced. Separate from submit() because
+        the specialist and route are only known once the run has finished."""
+        self._db.collection(self._collection).document(record_id).update({"trail": trail})
+
     def get(self, record_id: str) -> BriefingRecord | None:
         snap = self._db.collection(self._collection).document(record_id).get()
         return BriefingRecord.model_validate(snap.to_dict()) if snap.exists else None

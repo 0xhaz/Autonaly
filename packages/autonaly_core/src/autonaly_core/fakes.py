@@ -64,6 +64,11 @@ class InMemoryReviewQueue:
     def list(self, status: BriefingStatus | None = None) -> list[BriefingRecord]:
         return [r for r in self._records.values() if status is None or r.status is status]
 
+    def attach_trail(self, record_id: str, trail: dict) -> None:
+        record = self._records.get(record_id)
+        if record is not None:
+            self._records[record_id] = record.model_copy(update={"trail": trail})
+
     def approve(self, record_id: str) -> None:
         record = self._records[record_id]
         self._records[record_id] = record.model_copy(

@@ -218,6 +218,26 @@ class Rankings(BaseModel):
         return out
 
 
+class AgentTrail(BaseModel):
+    """How the briefing was produced — the routing decision, made visible.
+
+    The coordinator's choice of specialist is the one genuinely autonomous act
+    in the system, and it used to exist only in a log line. A reviewer deciding
+    whether to approve should be able to see which desk handled the event and
+    what it consulted, without leaving the product.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    coordinator: str = "crisis_desk"
+    specialist: str | None = None
+    """None when the coordinator handled it alone — an out-of-scope refusal."""
+
+    route: str | None = None
+    tools_used: list[str] = Field(default_factory=list)
+    model: str = ""
+
+
 class BriefingRecord(BaseModel):
     """What lands in the review queue for one-click human approval."""
 
@@ -241,6 +261,10 @@ class BriefingRecord(BaseModel):
     review_note: str | None = None
     """What the human reviewer needs to know before approving — most importantly
     any data-quality warning that blocked scoring."""
+
+    trail: AgentTrail | None = None
+    """Written after the run completes: the specialist and route are only known
+    once the agent has finished choosing them."""
 
     created_at: datetime
     published_at: datetime | None = None
