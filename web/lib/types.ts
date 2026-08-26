@@ -25,6 +25,14 @@ export interface Winner {
   evidence: string[];
 }
 
+export interface SourceImpact {
+  country: string;
+  export_revenue_at_risk_kusd: number;
+  basket_exports_kusd: number;
+  share_of_total_exports: number;
+  top_destinations: string[];
+}
+
 export interface Rankings {
   event_key: string;
   severity_label: string;
@@ -35,6 +43,7 @@ export interface Rankings {
   sources?: string[];
   largest_absolute_exposure: string | null;
   winners: Winner[];
+  sources_impact?: SourceImpact[];
   methodology_version: string;
 }
 

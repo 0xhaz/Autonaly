@@ -14,7 +14,7 @@ import logging
 from datetime import UTC, datetime
 
 import duckdb
-from autonaly_core.schema import AffectedCountry, Rankings, Winner
+from autonaly_core.schema import AffectedCountry, Rankings, SourceImpact, Winner
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -28,6 +28,7 @@ from .store import (
     country_totals,
     dependency_rows,
     importer_supplier_share,
+    source_export_exposure,
     source_world_share_matrix,
     supplier_shares,
     world_basket_total,
@@ -218,6 +219,33 @@ def compute_exposure(request: ExposureRequest) -> Rankings:
     # dependent country sitting just outside top_n is still a poor substitute.
     winners = _winners(con, paths, codes, sources, affected, ranked)
 
+    # The other side of the disruption. Every ranking above answers "who cannot
+    # buy"; this answers "who cannot sell", using the same severity so the two
+    # halves are directly comparable.
+    sources_impact = []
+    for source, basket_exports, total_exports in source_export_exposure(
+        con, paths, codes, sources
+    ):
+        if not basket_exports:
+            continue
+        destinations = country_export_destinations(con, paths, codes, source, 5)
+        sources_impact.append(
+            SourceImpact(
+                country=source,
+                export_revenue_at_risk_kusd=round(
+                    float(basket_exports) * severity.multiplier(), 1
+                ),
+                basket_exports_kusd=round(float(basket_exports), 1),
+                share_of_total_exports=(
+                    round(float(basket_exports) / float(total_exports), 4)
+                    if total_exports
+                    else 0.0
+                ),
+                top_destinations=[d for d, _v, _s in destinations],
+            )
+        )
+    sources_impact.sort(key=lambda s: s.export_revenue_at_risk_kusd, reverse=True)
+
     log.info(
         "exposure event=%s sources=%s baskets=%s -> %d affected in %.0fms",
         request.event_key,
@@ -240,6 +268,7 @@ def compute_exposure(request: ExposureRequest) -> Rankings:
         sources=list(sources),
         largest_absolute_exposure=largest.country if largest else None,
         winners=winners,
+        sources_impact=sources_impact,
         methodology_version=METHODOLOGY_VERSION,
     )
 

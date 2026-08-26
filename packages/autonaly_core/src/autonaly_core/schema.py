@@ -178,6 +178,31 @@ class EventDraft(BaseModel):
     confidence: Ratio = 0.0
 
 
+class SourceImpact(BaseModel):
+    """What the disrupted exporter loses.
+
+    Every ranking here answers "who cannot buy". A crisis has a second side:
+    the country whose exports stop also stops earning, and in a war scenario
+    that is usually the most affected party of all. Computed from the same
+    flows as the exposure ranking, so it needs no new data — only the question
+    asked in the other direction.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    country: str
+    export_revenue_at_risk_kusd: float
+    """Basket exports × the same severity applied to importers."""
+
+    basket_exports_kusd: float
+    share_of_total_exports: float
+    """How much of everything this country sells abroad rides on these baskets —
+    the difference between an inconvenience and an economy."""
+
+    top_destinations: list[str] = Field(default_factory=list)
+    """Who was buying it, largest first."""
+
+
 class Rankings(BaseModel):
     """Engine output. Deterministic — no LLM ever writes this (the architecture thesis)."""
 
@@ -206,6 +231,9 @@ class Rankings(BaseModel):
         ),
     )
     winners: list[Winner] = Field(default_factory=list)
+    sources_impact: list[SourceImpact] = Field(default_factory=list)
+    """The other side of the disruption: what the sources themselves lose."""
+
     methodology_version: str
 
     def numerals(self) -> set[str]:

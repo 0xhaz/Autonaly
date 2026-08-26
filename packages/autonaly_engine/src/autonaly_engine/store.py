@@ -263,6 +263,34 @@ def country_totals(
     return float(imports), float(exports), (float(exports) / world if world else 0.0)
 
 
+def source_export_exposure(
+    con: duckdb.DuckDBPyConnection,
+    paths: ArtifactPaths,
+    codes: tuple[str, ...],
+    sources: tuple[str, ...],
+) -> list[tuple[str, float, float]]:
+    """(source, basket exports, all exports) in kUSD — the sell side.
+
+    One scan for every source rather than a query each: the same mapping-join
+    lesson as country_economy, applied before it could become a problem.
+    """
+    if not sources:
+        return []
+    code_list = ",".join(f"'{c}'" for c in codes)
+    source_list = ",".join(f"'{s}'" for s in sources)
+    return con.execute(
+        f"""
+        SELECT
+            exporter,
+            COALESCE(SUM(CASE WHEN hs6 IN ({code_list}) THEN value_kusd END), 0) AS basket,
+            COALESCE(SUM(value_kusd), 0)                                        AS total
+        FROM '{paths.flows}'
+        WHERE exporter IN ({source_list})
+        GROUP BY 1
+        """
+    ).fetchall()
+
+
 def importer_supplier_share(
     con: duckdb.DuckDBPyConnection,
     paths: ArtifactPaths,

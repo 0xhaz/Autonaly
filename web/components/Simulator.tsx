@@ -520,6 +520,35 @@ export default function Simulator() {
       ]),
     });
 
+    const sellSideBlocks = (r: Rankings): DocsBlock[] =>
+      r.sources_impact?.length
+        ? [
+            { kind: "heading", text: "What the disrupted exporters lose" },
+            {
+              kind: "paragraphs",
+              italic: true,
+              text: [
+                "The other side of the disruption: who stops earning, rather than who cannot buy.",
+              ],
+            },
+            {
+              kind: "table",
+              headers: [
+                "Exporter",
+                "Revenue at risk",
+                "Share of its total exports",
+                "Was selling to",
+              ],
+              rows: r.sources_impact.map((x) => [
+                name(x.country),
+                formatKusd(x.export_revenue_at_risk_kusd),
+                `${(x.share_of_total_exports * 100).toFixed(1)}%`,
+                x.top_destinations.slice(0, 4).map(name).join(", "),
+              ]),
+            },
+          ]
+        : [];
+
     const winnersBlocks = (r: Rankings): DocsBlock[] =>
       r.winners?.length
         ? [
@@ -587,7 +616,10 @@ export default function Simulator() {
         );
       }
 
-      if (currentChannel) blocks.push(...winnersBlocks(currentChannel.rankings));
+      if (currentChannel) {
+        blocks.push(...sellSideBlocks(currentChannel.rankings));
+        blocks.push(...winnersBlocks(currentChannel.rankings));
+      }
       if (conflictResult.omissions) {
         blocks.push(
           { kind: "heading", text: "Not modelled" },
@@ -599,6 +631,7 @@ export default function Simulator() {
 
     if (rankings) {
       blocks.push({ kind: "heading", text: "Ranked exposure" }, rankingTable(rankings));
+      blocks.push(...sellSideBlocks(rankings));
       blocks.push(...winnersBlocks(rankings));
       if (assumption) {
         blocks.push(

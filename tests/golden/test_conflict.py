@@ -167,3 +167,27 @@ class TestCustomConflict:
         # A derived channel makes no coalition claim — reach must be global.
         result = _custom(client, ["BRA"])
         assert all(not c["coalition_only"] for c in result["channels"])
+
+
+class TestTheOtherSide:
+    """A crisis has two sides. Every ranking answers "who cannot buy"; the
+    disrupted exporter also stops earning, and in a war that is usually the
+    most affected party of all."""
+
+    def test_ukraine_loses_its_own_export_revenue(self, result):
+        impact = channel(result, "ukraine_collapse")["rankings"]["sources_impact"]
+        assert impact, "the collapsing exporter must appear on the sell side"
+        ukr = next(s for s in impact if s["country"] == "UKR")
+        # Grain and iron ore are a large share of everything Ukraine sells.
+        assert ukr["share_of_total_exports"] > 0.2
+        assert ukr["export_revenue_at_risk_kusd"] > 5_000_000
+        assert ukr["top_destinations"], "who was buying it is part of the answer"
+
+    def test_revenue_at_risk_never_exceeds_what_is_sold(self, result):
+        for ch in result["channels"]:
+            for s in ch["rankings"]["sources_impact"]:
+                assert s["export_revenue_at_risk_kusd"] <= s["basket_exports_kusd"] + 1
+
+    def test_sanctions_channel_hits_the_sanctioned_exporter(self, result):
+        impact = channel(result, "russia_sanctions")["rankings"]["sources_impact"]
+        assert any(s["country"] == "RUS" for s in impact)

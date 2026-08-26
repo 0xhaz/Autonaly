@@ -151,6 +151,37 @@ export default function BriefingWorkspace({
         />
       </div>
 
+      {(rankings.sources_impact?.length ?? 0) > 0 && (
+        <section className="panel p-4">
+          <h2 className="text-sm font-semibold">What the disrupted exporters lose</h2>
+          <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+            The other side of the disruption. Everything above answers who cannot
+            buy; this is who stops earning — often the country at the centre of
+            the crisis, and usually absent from an exposure ranking entirely.
+          </p>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {rankings.sources_impact!.map((s) => (
+              <li key={s.country} className="rounded-md p-3" style={{ background: "var(--panel-2)" }}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-semibold">{names[s.country] ?? s.country}</span>
+                  <span className="mono text-sm" style={{ color: "var(--warn)" }}>
+                    {formatKusd(s.export_revenue_at_risk_kusd)}
+                  </span>
+                </div>
+                <div className="mono mt-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                  {(s.share_of_total_exports * 100).toFixed(1)}% of all its goods exports
+                </div>
+                {s.top_destinations.length > 0 && (
+                  <div className="mt-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                    sold to {s.top_destinations.slice(0, 4).map((d) => names[d] ?? d).join(", ")}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {(rankings.winners?.length ?? 0) > 0 && (
         <section className="panel p-4">
           <h2 className="text-sm font-semibold">Who benefits</h2>
