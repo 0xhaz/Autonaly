@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import CountryPanel from "@/components/CountryPanel";
 import ExposureMap, { type MapMarker } from "@/components/ExposureMap";
+import { GLOSSARY_SHORT } from "@/lib/glossary";
 import { formatKusd, formatPercent, type Rankings } from "@/lib/types";
 
 /**
@@ -21,16 +22,23 @@ function StatTile({
   value,
   sub,
   accent,
+  hint,
 }: {
   label: string;
   value: string;
   sub?: string;
   accent?: boolean;
+  hint?: string;
 }) {
   return (
     <div className="panel p-4">
-      <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+      <div
+        className="text-[10px] uppercase tracking-wider"
+        style={{ color: "var(--muted)", cursor: hint ? "help" : undefined }}
+        title={hint}
+      >
         {label}
+        {hint && <span aria-hidden> ⓘ</span>}
       </div>
       <div
         className="mono mt-1 text-2xl font-semibold tabular-nums"
@@ -96,17 +104,20 @@ export default function BriefingWorkspace({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
           label="Value at risk (ranked)"
+          hint={GLOSSARY_SHORT["Value at risk"]}
           value={formatKusd(totals.atRisk)}
           sub={`${rankings.affected.length} countries ranked`}
           accent
         />
         <StatTile
           label="Largest absolute"
+          hint={GLOSSARY_SHORT["Largest absolute"]}
           value={largest ?? "—"}
           sub={totals.largestRow ? formatKusd(totals.largestRow.value_at_risk_kusd) : undefined}
         />
         <StatTile
           label="Most dependent"
+          hint={GLOSSARY_SHORT["Most dependent"]}
           value={totals.worst?.country ?? "—"}
           sub={
             totals.worst
@@ -116,6 +127,7 @@ export default function BriefingWorkspace({
         />
         <StatTile
           label="Severity"
+          hint={GLOSSARY_SHORT["Severity"]}
           value={rankings.severity_label.replace(/_/g, " ")}
           sub={`methodology ${rankings.methodology_version}`}
         />
@@ -166,7 +178,11 @@ export default function BriefingWorkspace({
           <div>
             <h2 className="text-sm font-semibold">Ranked exposure</h2>
             <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
-              Ordered by dependency intensity. Every score carries the ratios behind it.
+              Ordered by dependency intensity — not by dollars. Every score carries the
+              ratios behind it; hover any column for what it means.{" "}
+              <a href="/methodology" style={{ color: "var(--accent)" }}>
+                Full methodology →
+              </a>
             </p>
           </div>
           <span className="text-[11px]" style={{ color: "var(--muted)" }}>
@@ -178,10 +194,10 @@ export default function BriefingWorkspace({
             <thead>
               <tr>
                 <th>Country</th>
-                <th>Score</th>
-                <th>Dependency</th>
-                <th>Concentration</th>
-                <th>Value at risk</th>
+                <th title={GLOSSARY_SHORT["Score"]} style={{ cursor: "help" }}>Score ⓘ</th>
+                <th title={GLOSSARY_SHORT["Dependency (DDR)"]} style={{ cursor: "help" }}>Dependency ⓘ</th>
+                <th title={GLOSSARY_SHORT["Concentration (HHI)"]} style={{ cursor: "help" }}>Concentration ⓘ</th>
+                <th title={GLOSSARY_SHORT["Value at risk"]} style={{ cursor: "help" }}>Value at risk ⓘ</th>
               </tr>
             </thead>
             <tbody>

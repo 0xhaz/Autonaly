@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { GLOSSARY } from "@/lib/glossary";
+
 /**
  * The methodology page (architecture D14): every simplification stated in one
  * place, linkable from every number. A reference product that hides its
@@ -90,6 +92,24 @@ export default function MethodologyPage() {
             attenuated when a sea bypass exists.
           </li>
         </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">Glossary</h2>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
+          Every figure the product shows, and what it does and does not let you
+          conclude. The same definitions travel inside exported documents.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {GLOSSARY.map((entry) => (
+            <div key={entry.term} className="panel p-4">
+              <h3 className="text-xs font-semibold">{entry.term}</h3>
+              <p className="mt-1.5 text-xs leading-relaxed" style={{ color: "var(--muted)" }}>
+                {entry.full}
+              </p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="panel space-y-3 p-5">

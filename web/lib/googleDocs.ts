@@ -182,6 +182,9 @@ export interface DocSpec {
   /** Beneficiaries: the other half of any disruption, and the half most
    *  reports omit. */
   winners?: DocTable;
+  /** Definitions for every column the reader is about to meet. Always
+   *  included: a ranking is not analysis if the figures are unexplained. */
+  glossary?: DocTable;
   /** A PNG of the exposure map, already uploaded somewhere Google can fetch.
    *  Additive by contract — if it is missing or fails, the document is still
    *  complete. */
@@ -408,6 +411,13 @@ export async function exportToDocs(userId: string, spec: DocSpec): Promise<strin
       { text: spec.winners.caption ?? "Who benefits", style: "HEADING_1" },
     ]);
     await appendTable(token, documentId, spec.winners);
+  }
+
+  if (spec.glossary?.rows.length) {
+    await appendText(token, documentId, [
+      { text: spec.glossary.caption ?? "How to read these figures", style: "HEADING_1" },
+    ]);
+    await appendTable(token, documentId, spec.glossary);
   }
 
   if (spec.footer) {
