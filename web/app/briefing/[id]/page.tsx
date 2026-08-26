@@ -102,7 +102,7 @@ export default async function BriefingPage({
           <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--warn)" }}>
             Data-quality warning — severity not computed
           </p>
-          <p className="mt-2 text-sm" style={{ color: "#e6d5ad" }}>
+          <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
             {briefing.review_note}
           </p>
         </div>

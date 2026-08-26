@@ -15,8 +15,8 @@ import GlobalMap, { type LayerToggles } from "@/components/GlobalMap";
  */
 
 const LAYER_META: { key: keyof LayerToggles; label: string; hint: string; swatch: string }[] = [
-  { key: "lanes", label: "Shipping lanes", hint: "Indicative maritime routes", swatch: "#a8c8ea" },
-  { key: "ports", label: "Major ports", hint: "300 busiest, sized by vessel traffic", swatch: "#7fb2e8" },
+  { key: "lanes", label: "Shipping lanes", hint: "Indicative maritime routes", swatch: "var(--map-lane-2)" },
+  { key: "ports", label: "Major ports", hint: "300 busiest, sized by vessel traffic", swatch: "var(--map-port)" },
   { key: "chokepoints", label: "Chokepoints", hint: "28 straits and canals, drawn as rings", swatch: "var(--warn)" },
 ];
 
