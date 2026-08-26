@@ -173,74 +173,21 @@ export interface DocTable {
 export interface DocSpec {
   title: string;
   subtitle?: string;
+  /** The headline numbers, rendered as a compact two-column table up front —
+   *  a reader who opens the document and reads nothing else should still get
+   *  the four figures that matter. */
+  facts?: { label: string; value: string }[];
   sections: DocSection[];
   table?: DocTable;
+  /** Beneficiaries: the other half of any disruption, and the half most
+   *  reports omit. */
+  winners?: DocTable;
+  /** A PNG of the exposure map, already uploaded somewhere Google can fetch.
+   *  Additive by contract — if it is missing or fails, the document is still
+   *  complete. */
+  imageUrl?: string;
   footer?: string;
 }
-
-interface StyledRange {
-  start: number;
-  end: number;
-  style: "TITLE" | "SUBTITLE" | "HEADING_1" | "NORMAL_TEXT";
-  italic?: boolean;
-  small?: boolean;
-}
-
-/**
- * Docs is index-addressed, and every insert shifts everything after it. So the
- * body is composed as one string with offsets recorded as it grows, inserted
- * in a single request, and only then styled by range — rather than a sequence
- * of inserts whose indices have to be recomputed after each one.
- */
-function composeBody(spec: DocSpec): { text: string; ranges: StyledRange[] } {
-  let text = "";
-  const ranges: StyledRange[] = [];
-  const push = (chunk: string, style: StyledRange["style"], extra: Partial<StyledRange> = {}) => {
-    const start = text.length;
-    text += `${chunk}\n`;
-    ranges.push({ start, end: start + chunk.length, style, ...extra });
-  };
-
-  push(spec.title, "TITLE");
-  if (spec.subtitle) push(spec.subtitle, "SUBTITLE", { italic: true });
-
-  for (const section of spec.sections) {
-    if (section.heading) push(section.heading, "HEADING_1");
-    for (const paragraph of section.paragraphs) {
-      if (paragraph.trim()) push(paragraph, "NORMAL_TEXT");
-    }
-  }
-  if (spec.table?.caption) push(spec.table.caption, "HEADING_1");
-  return { text, ranges };
-}
-
-const STYLE_REQUESTS = (ranges: StyledRange[]) =>
-  ranges.flatMap((r) => {
-    // +1: Docs bodies start at index 1, so string offsets shift by one.
-    const range = { startIndex: r.start + 1, endIndex: r.end + 1 };
-    const requests: object[] = [
-      {
-        updateParagraphStyle: {
-          range,
-          paragraphStyle: { namedStyleType: r.style },
-          fields: "namedStyleType",
-        },
-      },
-    ];
-    if (r.italic || r.small) {
-      requests.push({
-        updateTextStyle: {
-          range,
-          textStyle: {
-            ...(r.italic ? { italic: true } : {}),
-            ...(r.small ? { fontSize: { magnitude: 9, unit: "PT" } } : {}),
-          },
-          fields: [r.italic && "italic", r.small && "fontSize"].filter(Boolean).join(","),
-        },
-      });
-    }
-    return requests;
-  });
 
 async function docsApi(
   token: string,
@@ -264,60 +211,89 @@ async function docsApi(
   return json;
 }
 
-/** Creates the document and returns its URL. */
-export async function exportToDocs(userId: string, spec: DocSpec): Promise<string> {
-  const token = await accessToken(userId);
-  if (!token) throw new Error("google account not connected");
+interface TextBlock {
+  text: string;
+  style: "TITLE" | "SUBTITLE" | "HEADING_1" | "NORMAL_TEXT";
+  italic?: boolean;
+}
 
-  const created = await docsApi(token, "", { title: spec.title });
-  const documentId = created.documentId as string;
-
-  const { text, ranges } = composeBody(spec);
-  await docsApi(token, `/${documentId}:batchUpdate`, {
-    requests: [{ insertText: { location: { index: 1 }, text } }, ...STYLE_REQUESTS(ranges)],
-  });
-
-  if (spec.table) {
-    await insertTable(token, documentId, spec.table, text.length + 1);
-  }
-  if (spec.footer) {
-    await appendFooter(token, documentId, spec.footer);
-  }
-  const url = `https://docs.google.com/document/d/${documentId}/edit`;
-  await recordExport(userId, {
-    title: spec.title,
-    url,
-    created_at: new Date().toISOString(),
-  });
-  return url;
+async function docEnd(token: string, documentId: string): Promise<number> {
+  const doc = await docsApi(token, `/${documentId}`);
+  const content = (doc.body as { content: { endIndex?: number }[] }).content;
+  return Math.max(1, (content[content.length - 1]?.endIndex ?? 2) - 1);
 }
 
 /**
- * Tables need two round trips: cell indices only exist once the table does,
- * and they cannot be predicted from the request. So insert, read the document
- * back to find each cell, then fill from the last cell backwards — filling
- * forwards would invalidate every index after the first insertion.
+ * Append styled paragraphs at the end of the document.
+ *
+ * Everything is appended rather than positioned, because Docs is
+ * index-addressed and every insert shifts what follows it. Building the
+ * document strictly front-to-back means an index only has to be correct at the
+ * moment it is used, and tables and images can be interleaved with prose
+ * without recomputing anything.
  */
-async function insertTable(
+async function appendText(
+  token: string,
+  documentId: string,
+  blocks: TextBlock[],
+): Promise<void> {
+  if (blocks.length === 0) return;
+  const at = await docEnd(token, documentId);
+
+  let text = "";
+  const requests: object[] = [];
+  const styled: { start: number; end: number; block: TextBlock }[] = [];
+  for (const block of blocks) {
+    const offset = text.length;
+    text += `${block.text}\n`;
+    styled.push({ start: offset, end: offset + block.text.length, block });
+  }
+  requests.push({ insertText: { location: { index: at }, text } });
+
+  for (const { start, end, block } of styled) {
+    const range = { startIndex: at + start, endIndex: at + end };
+    requests.push({
+      updateParagraphStyle: {
+        range,
+        paragraphStyle: { namedStyleType: block.style },
+        fields: "namedStyleType",
+      },
+    });
+    if (block.italic) {
+      requests.push({
+        updateTextStyle: { range, textStyle: { italic: true }, fields: "italic" },
+      });
+    }
+  }
+  await docsApi(token, `/${documentId}:batchUpdate`, { requests });
+}
+
+/**
+ * Tables need two round trips: cell indices only exist once the table does and
+ * cannot be predicted from the request. Cells fill back-to-front so earlier
+ * insertions do not invalidate later indices.
+ */
+async function appendTable(
   token: string,
   documentId: string,
   table: DocTable,
-  atIndex: number,
 ): Promise<void> {
+  const at = await docEnd(token, documentId);
   const rows = table.rows.length + 1;
   const columns = table.headers.length;
   await docsApi(token, `/${documentId}:batchUpdate`, {
-    requests: [{ insertTable: { rows, columns, location: { index: atIndex - 1 } } }],
+    requests: [{ insertTable: { rows, columns, location: { index: at } } }],
   });
 
   const doc = await docsApi(token, `/${documentId}`);
   const content = (doc.body as { content: Record<string, unknown>[] }).content;
-  const tableElement = content.find((element) => "table" in element);
-  if (!tableElement) return;
+  const tables = content.filter((element) => "table" in element);
+  const target = tables[tables.length - 1];
+  if (!target) return;
 
-  const tableRows = (tableElement.table as { tableRows: Record<string, unknown>[] }).tableRows;
+  const tableRows = (target.table as { tableRows: Record<string, unknown>[] }).tableRows;
   const grid = [table.headers, ...table.rows];
-  const fills: { index: number; text: string }[] = [];
+  const fills: { index: number; text: string; header: boolean }[] = [];
 
   tableRows.forEach((row, rowIndex) => {
     const cells = (row as { tableCells: Record<string, unknown>[] }).tableCells;
@@ -325,7 +301,9 @@ async function insertTable(
       const cellContent = (cell as { content: Record<string, unknown>[] }).content;
       const paragraph = cellContent[0] as { startIndex: number };
       const value = grid[rowIndex]?.[columnIndex] ?? "";
-      if (value) fills.push({ index: paragraph.startIndex, text: value });
+      if (value) {
+        fills.push({ index: paragraph.startIndex, text: value, header: rowIndex === 0 });
+      }
     });
   });
 
@@ -336,11 +314,10 @@ async function insertTable(
     })),
   });
 
-  // Header row in bold, once the text exists.
-  const headerCells = fills.filter((_, i) => i >= fills.length - columns);
-  if (headerCells.length) {
+  const headers = fills.filter((f) => f.header);
+  if (headers.length) {
     await docsApi(token, `/${documentId}:batchUpdate`, {
-      requests: headerCells.map((cell) => ({
+      requests: headers.map((cell) => ({
         updateTextStyle: {
           range: { startIndex: cell.index, endIndex: cell.index + cell.text.length },
           textStyle: { bold: true },
@@ -349,6 +326,101 @@ async function insertTable(
       })),
     });
   }
+}
+
+/** Google fetches the image itself, so the URL must be publicly reachable at
+ *  insert time. Failure is swallowed by the caller: a document without its map
+ *  is still a complete document. */
+async function appendImage(token: string, documentId: string, uri: string): Promise<void> {
+  const at = await docEnd(token, documentId);
+  await docsApi(token, `/${documentId}:batchUpdate`, {
+    requests: [
+      {
+        insertInlineImage: {
+          location: { index: at },
+          uri,
+          objectSize: {
+            width: { magnitude: 468, unit: "PT" },
+            height: { magnitude: 260, unit: "PT" },
+          },
+        },
+      },
+    ],
+  });
+}
+
+/** Creates the document and returns its URL. */
+export async function exportToDocs(userId: string, spec: DocSpec): Promise<string> {
+  const token = await accessToken(userId);
+  if (!token) throw new Error("google account not connected");
+
+  const created = await docsApi(token, "", { title: spec.title });
+  const documentId = created.documentId as string;
+
+  const head: TextBlock[] = [{ text: spec.title, style: "TITLE" }];
+  if (spec.subtitle) head.push({ text: spec.subtitle, style: "SUBTITLE", italic: true });
+  if (spec.facts?.length) head.push({ text: "Key figures", style: "HEADING_1" });
+  await appendText(token, documentId, head);
+
+  if (spec.facts?.length) {
+    await appendTable(token, documentId, {
+      headers: ["Measure", "Value"],
+      rows: spec.facts.map((f) => [f.label, f.value]),
+    });
+  }
+
+  const body: TextBlock[] = [];
+  for (const section of spec.sections) {
+    if (section.heading) body.push({ text: section.heading, style: "HEADING_1" });
+    for (const paragraph of section.paragraphs) {
+      if (paragraph.trim()) body.push({ text: paragraph, style: "NORMAL_TEXT" });
+    }
+  }
+  await appendText(token, documentId, body);
+
+  if (spec.imageUrl) {
+    try {
+      await appendText(token, documentId, [
+        { text: "Exposure map", style: "HEADING_1" },
+      ]);
+      await appendImage(token, documentId, spec.imageUrl);
+      await appendText(token, documentId, [
+        {
+          text: "Colour is dependency intensity; the outlined country carries the largest absolute exposure.",
+          style: "NORMAL_TEXT",
+          italic: true,
+        },
+      ]);
+    } catch {
+      // Additive by contract — never fail an export over its illustration.
+    }
+  }
+
+  if (spec.table) {
+    await appendText(token, documentId, [
+      { text: spec.table.caption ?? "Ranked exposure", style: "HEADING_1" },
+    ]);
+    await appendTable(token, documentId, spec.table);
+  }
+
+  if (spec.winners?.rows.length) {
+    await appendText(token, documentId, [
+      { text: spec.winners.caption ?? "Who benefits", style: "HEADING_1" },
+    ]);
+    await appendTable(token, documentId, spec.winners);
+  }
+
+  if (spec.footer) {
+    await appendFooter(token, documentId, spec.footer);
+  }
+
+  const url = `https://docs.google.com/document/d/${documentId}/edit`;
+  await recordExport(userId, {
+    title: spec.title,
+    url,
+    created_at: new Date().toISOString(),
+  });
+  return url;
 }
 
 async function appendFooter(token: string, documentId: string, footer: string): Promise<void> {

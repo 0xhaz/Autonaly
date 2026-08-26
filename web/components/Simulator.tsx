@@ -471,6 +471,44 @@ export default function Simulator() {
         ? (current?.label ?? "Chokepoint scenario")
         : `Port of ${currentPort?.name ?? ""}`;
 
+  const docsFacts = (() => {
+    const name = (iso3: string) => countryNames[iso3] ?? iso3;
+    if (mode === "conflict" && conflictResult) {
+      const top = conflictResult.combined[0];
+      return [
+        { label: "Channels modelled", value: String(conflictResult.channels.length) },
+        { label: "Intensity", value: `${Math.round(conflictResult.intensity * 100)}%` },
+        { label: "Duration", value: `${months} months` },
+        ...(top
+          ? [{ label: "Largest combined exposure", value: `${name(top.country)} — ${formatKusd(top.total_value_at_risk_kusd)}` }]
+          : []),
+      ];
+    }
+    if (!rankings) return undefined;
+    const total = rankings.affected.reduce((sum, a) => sum + (a.value_at_risk_kusd ?? 0), 0);
+    const largest = rankings.affected.find((a) => a.country === rankings.largest_absolute_exposure);
+    const worst = rankings.affected[0];
+    return [
+      { label: "Value at risk (ranked)", value: `${formatKusd(total)} across ${rankings.affected.length} countries` },
+      ...(largest ? [{ label: "Largest absolute exposure", value: `${name(largest.country)} — ${formatKusd(largest.value_at_risk_kusd)}` }] : []),
+      ...(worst ? [{ label: "Most dependent", value: `${name(worst.country)} — ${((worst.ddr ?? 0) * 100).toFixed(1)}% from disrupted origins` }] : []),
+      { label: "Severity", value: `${rankings.severity_label} · ${reduction}% reduction over ${months} months` },
+    ];
+  })();
+
+  const docsWinners = (() => {
+    const name = (iso3: string) => countryNames[iso3] ?? iso3;
+    const list =
+      mode === "conflict"
+        ? currentChannel?.rankings.winners
+        : rankings?.winners;
+    if (!list?.length) return undefined;
+    return {
+      headers: ["Country", "Why it gains"],
+      rows: list.map((w) => [name(w.country), w.evidence?.[0] ?? w.mechanism]),
+    };
+  })();
+
   const docsTable = (() => {
     const name = (iso3: string) => countryNames[iso3] ?? iso3;
     if (mode === "conflict" && conflictResult) {
@@ -539,6 +577,8 @@ export default function Simulator() {
                     narrative={brief}
                     tableCaption="Ranked exposure"
                     table={docsTable}
+                    facts={docsFacts}
+                    winners={docsWinners}
                   />
                 )}
                 <button

@@ -246,6 +246,9 @@ export default function ExposureMap({
     const m = new maplibre.Map({
       container: container.current,
       style,
+      // Required for canvas export: without it the drawing buffer is cleared
+      // after paint and toDataURL() returns a blank PNG.
+      preserveDrawingBuffer: true,
       center: [15, 25],
       zoom: 1.05,
       attributionControl: false,

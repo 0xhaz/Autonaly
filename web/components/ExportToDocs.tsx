@@ -21,12 +21,16 @@ export default function ExportToDocs({
   narrative,
   table,
   tableCaption,
+  facts,
+  winners,
 }: {
   title: string;
   subtitle?: string;
   narrative: string;
   table?: DocsTable;
   tableCaption?: string;
+  facts?: { label: string; value: string }[];
+  winners?: DocsTable;
 }) {
   const [state, setState] = useState<"loading" | "off" | "disconnected" | "ready">("loading");
   const [busy, setBusy] = useState(false);
@@ -46,10 +50,20 @@ export default function ExportToDocs({
   const exportDoc = async () => {
     setBusy(true);
     setError(null);
+    // The exposure map is on the page as a WebGL canvas; grab it so the
+    // document carries the picture and not just the numbers. Best effort —
+    // if the canvas is absent or unreadable the export proceeds without it.
+    let mapPng: string | undefined;
+    try {
+      const canvas = document.querySelector<HTMLCanvasElement>("canvas.maplibregl-canvas");
+      mapPng = canvas?.toDataURL("image/png") ?? undefined;
+    } catch {
+      mapPng = undefined;
+    }
     const response = await fetch("/api/export/docs", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title, subtitle, narrative, table, tableCaption }),
+      body: JSON.stringify({ title, subtitle, narrative, table, tableCaption, facts, winners, mapPng }),
     });
     setBusy(false);
     if (response.status === 409) return setState("disconnected");

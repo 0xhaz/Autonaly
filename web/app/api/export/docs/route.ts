@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
+import { uploadMapImage } from "@/lib/exportImage";
 import { type DocSection, type DocSpec, exportToDocs } from "@/lib/googleDocs";
 
 /**
@@ -44,9 +45,18 @@ export async function POST(request: NextRequest) {
   }
 
   const rawTable = body.table as { headers?: string[]; rows?: string[][] } | undefined;
+  const rawWinners = body.winners as { headers?: string[]; rows?: string[][] } | undefined;
+  const facts = Array.isArray(body.facts)
+    ? (body.facts as { label: string; value: string }[])
+        .slice(0, 6)
+        .map((f) => ({ label: String(f.label), value: String(f.value) }))
+    : undefined;
+  const imageUrl = typeof body.mapPng === "string" ? await uploadMapImage(body.mapPng) : null;
   const spec: DocSpec = {
     title: String(body.title ?? "Autonaly briefing").slice(0, 200),
     subtitle: body.subtitle ? String(body.subtitle).slice(0, 400) : undefined,
+    facts,
+    imageUrl: imageUrl ?? undefined,
     sections: parseNarrative(narrative),
     table:
       rawTable?.headers?.length && rawTable.rows?.length
@@ -55,6 +65,14 @@ export async function POST(request: NextRequest) {
             headers: rawTable.headers.map(String),
             // Docs tables are for reading, not for scrolling.
             rows: rawTable.rows.slice(0, 20).map((r) => r.map(String)),
+          }
+        : undefined,
+    winners:
+      rawWinners?.headers?.length && rawWinners.rows?.length
+        ? {
+            caption: "Who benefits",
+            headers: rawWinners.headers.map(String),
+            rows: rawWinners.rows.slice(0, 10).map((r) => r.map(String)),
           }
         : undefined,
     footer: String(
