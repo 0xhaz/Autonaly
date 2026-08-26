@@ -195,164 +195,50 @@ export interface DocSpec {
   footer?: string;
 }
 
+interface StyleRun {
+  start: number;
+  end: number;
+  style: "TITLE" | "SUBTITLE" | "HEADING_1" | "NORMAL_TEXT";
+  italic?: boolean;
+}
+
+/**
+ * Compose the whole document, then write it in a handful of calls.
+ *
+ * The first version appended block by block, reading the document back before
+ * each one to find the end index. That is ~5 API calls per table and 2 per
+ * paragraph — around forty round trips for a full conflict report, which
+ * exhausted the Docs per-minute write quota and failed the export outright
+ * (17s, then an instant rejection on retry as the quota stayed spent).
+ *
+ * Because all prose goes in as a single insertText at index 1, every character
+ * offset is known in advance — so tables and images can be placed by
+ * arithmetic rather than by reading the document back. Inserting them in
+ * reverse index order means each insertion only shifts content after it, which
+ * has already been placed. Five calls, whatever the report's length.
+ */
 async function docsApi(
   token: string,
   path: string,
   body?: object,
 ): Promise<Record<string, unknown>> {
-  const response = await fetch(`https://docs.googleapis.com/v1/documents${path}`, {
-    method: body ? "POST" : "GET",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  const json = await response.json();
-  if (!response.ok) {
-    throw new Error(
-      `docs api ${response.status}: ${JSON.stringify(json).slice(0, 300)}`,
-    );
-  }
-  return json;
-}
-
-interface TextBlock {
-  text: string;
-  style: "TITLE" | "SUBTITLE" | "HEADING_1" | "NORMAL_TEXT";
-  italic?: boolean;
-}
-
-async function docEnd(token: string, documentId: string): Promise<number> {
-  const doc = await docsApi(token, `/${documentId}`);
-  const content = (doc.body as { content: { endIndex?: number }[] }).content;
-  return Math.max(1, (content[content.length - 1]?.endIndex ?? 2) - 1);
-}
-
-/**
- * Append styled paragraphs at the end of the document.
- *
- * Everything is appended rather than positioned, because Docs is
- * index-addressed and every insert shifts what follows it. Building the
- * document strictly front-to-back means an index only has to be correct at the
- * moment it is used, and tables and images can be interleaved with prose
- * without recomputing anything.
- */
-async function appendText(
-  token: string,
-  documentId: string,
-  blocks: TextBlock[],
-): Promise<void> {
-  if (blocks.length === 0) return;
-  const at = await docEnd(token, documentId);
-
-  let text = "";
-  const requests: object[] = [];
-  const styled: { start: number; end: number; block: TextBlock }[] = [];
-  for (const block of blocks) {
-    const offset = text.length;
-    text += `${block.text}\n`;
-    styled.push({ start: offset, end: offset + block.text.length, block });
-  }
-  requests.push({ insertText: { location: { index: at }, text } });
-
-  for (const { start, end, block } of styled) {
-    const range = { startIndex: at + start, endIndex: at + end };
-    requests.push({
-      updateParagraphStyle: {
-        range,
-        paragraphStyle: { namedStyleType: block.style },
-        fields: "namedStyleType",
-      },
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(`https://docs.googleapis.com/v1/documents${path}`, {
+      method: body ? "POST" : "GET",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    if (block.italic) {
-      requests.push({
-        updateTextStyle: { range, textStyle: { italic: true }, fields: "italic" },
-      });
+    if (response.status === 429 && attempt < 3) {
+      // Quota is per minute; a short wait is usually enough.
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+      continue;
     }
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(`docs api ${response.status}: ${JSON.stringify(json).slice(0, 400)}`);
+    }
+    return json;
   }
-  await docsApi(token, `/${documentId}:batchUpdate`, { requests });
-}
-
-/**
- * Tables need two round trips: cell indices only exist once the table does and
- * cannot be predicted from the request. Cells fill back-to-front so earlier
- * insertions do not invalidate later indices.
- */
-async function appendTable(
-  token: string,
-  documentId: string,
-  table: DocTable,
-): Promise<void> {
-  const at = await docEnd(token, documentId);
-  const rows = table.rows.length + 1;
-  const columns = table.headers.length;
-  await docsApi(token, `/${documentId}:batchUpdate`, {
-    requests: [{ insertTable: { rows, columns, location: { index: at } } }],
-  });
-
-  const doc = await docsApi(token, `/${documentId}`);
-  const content = (doc.body as { content: Record<string, unknown>[] }).content;
-  const tables = content.filter((element) => "table" in element);
-  const target = tables[tables.length - 1];
-  if (!target) return;
-
-  const tableRows = (target.table as { tableRows: Record<string, unknown>[] }).tableRows;
-  const grid = [table.headers, ...table.rows];
-  const fills: { index: number; text: string; header: boolean }[] = [];
-
-  tableRows.forEach((row, rowIndex) => {
-    const cells = (row as { tableCells: Record<string, unknown>[] }).tableCells;
-    cells.forEach((cell, columnIndex) => {
-      const cellContent = (cell as { content: Record<string, unknown>[] }).content;
-      const paragraph = cellContent[0] as { startIndex: number };
-      const value = grid[rowIndex]?.[columnIndex] ?? "";
-      if (value) {
-        fills.push({ index: paragraph.startIndex, text: value, header: rowIndex === 0 });
-      }
-    });
-  });
-
-  fills.sort((a, b) => b.index - a.index);
-  await docsApi(token, `/${documentId}:batchUpdate`, {
-    requests: fills.map((fill) => ({
-      insertText: { location: { index: fill.index }, text: fill.text },
-    })),
-  });
-
-  const headers = fills.filter((f) => f.header);
-  if (headers.length) {
-    await docsApi(token, `/${documentId}:batchUpdate`, {
-      requests: headers.map((cell) => ({
-        updateTextStyle: {
-          range: { startIndex: cell.index, endIndex: cell.index + cell.text.length },
-          textStyle: { bold: true },
-          fields: "bold",
-        },
-      })),
-    });
-  }
-}
-
-/** Google fetches the image itself, so the URL must be publicly reachable at
- *  insert time. Failure is swallowed by the caller: a document without its map
- *  is still a complete document. */
-async function appendImage(token: string, documentId: string, uri: string): Promise<void> {
-  const at = await docEnd(token, documentId);
-  await docsApi(token, `/${documentId}:batchUpdate`, {
-    requests: [
-      {
-        insertInlineImage: {
-          location: { index: at },
-          uri,
-          objectSize: {
-            width: { magnitude: 468, unit: "PT" },
-            height: { magnitude: 260, unit: "PT" },
-          },
-        },
-      },
-    ],
-  });
 }
 
 /** Creates the document and returns its URL. */
@@ -363,58 +249,159 @@ export async function exportToDocs(userId: string, spec: DocSpec): Promise<strin
   const created = await docsApi(token, "", { title: spec.title });
   const documentId = created.documentId as string;
 
-  const head: TextBlock[] = [{ text: spec.title, style: "TITLE" }];
-  if (spec.subtitle) head.push({ text: spec.subtitle, style: "SUBTITLE", italic: true });
-  await appendText(token, documentId, head);
+  const blocks: DocBlock[] = [...spec.blocks];
+  if (spec.glossary?.rows.length) {
+    blocks.push(
+      { kind: "heading", text: spec.glossary.caption ?? "How to read these figures" },
+      { kind: "table", headers: spec.glossary.headers, rows: spec.glossary.rows },
+    );
+  }
 
-  for (const block of spec.blocks) {
+  // --- compose the prose, recording where the structural elements belong ----
+  let text = "";
+  const runs: StyleRun[] = [];
+  const tables: { offset: number; table: DocTable }[] = [];
+  const images: { offset: number; url: string }[] = [];
+
+  const push = (line: string, style: StyleRun["style"], italic = false) => {
+    const at = text.length;
+    text += `${line}\n`;
+    runs.push({ start: at, end: at + line.length, style, italic });
+  };
+
+  push(spec.title, "TITLE");
+  if (spec.subtitle) push(spec.subtitle, "SUBTITLE", true);
+
+  for (const block of blocks) {
     switch (block.kind) {
       case "heading":
-        await appendText(token, documentId, [{ text: block.text, style: "HEADING_1" }]);
+        push(block.text, "HEADING_1");
         break;
       case "paragraphs":
-        await appendText(
-          token,
-          documentId,
-          block.text
-            .filter((t) => t.trim())
-            .map((t) => ({ text: t, style: "NORMAL_TEXT" as const, italic: block.italic })),
-        );
+        for (const line of block.text) {
+          if (line.trim()) push(line, "NORMAL_TEXT", block.italic);
+        }
         break;
       case "table":
         if (block.rows.length) {
-          await appendTable(token, documentId, {
-            headers: block.headers,
-            rows: block.rows,
+          tables.push({
+            offset: text.length,
+            table: { headers: block.headers, rows: block.rows },
           });
+          // A blank line reserves the spot the table will occupy.
+          text += "\n";
         }
         break;
       case "image":
-        // Additive by contract: a document without its illustration is still
-        // a complete document, so a failed insert is swallowed.
-        try {
-          await appendImage(token, documentId, block.url);
-          if (block.caption) {
-            await appendText(token, documentId, [
-              { text: block.caption, style: "NORMAL_TEXT", italic: true },
-            ]);
-          }
-        } catch {
-          /* keep going */
-        }
+        images.push({ offset: text.length, url: block.url });
+        text += "\n";
+        if (block.caption) push(block.caption, "NORMAL_TEXT", true);
         break;
     }
   }
+  if (spec.footer) push(spec.footer, "NORMAL_TEXT", true);
 
-  if (spec.glossary?.rows.length) {
-    await appendText(token, documentId, [
-      { text: spec.glossary.caption ?? "How to read these figures", style: "HEADING_1" },
-    ]);
-    await appendTable(token, documentId, spec.glossary);
+  // --- call 1: all prose and all styling -----------------------------------
+  await docsApi(token, `/${documentId}:batchUpdate`, {
+    requests: [
+      { insertText: { location: { index: 1 }, text } },
+      ...runs.flatMap((r) => {
+        const range = { startIndex: r.start + 1, endIndex: r.end + 1 };
+        const reqs: object[] = [
+          {
+            updateParagraphStyle: {
+              range,
+              paragraphStyle: { namedStyleType: r.style },
+              fields: "namedStyleType",
+            },
+          },
+        ];
+        if (r.italic) {
+          reqs.push({
+            updateTextStyle: { range, textStyle: { italic: true }, fields: "italic" },
+          });
+        }
+        return reqs;
+      }),
+    ],
+  });
+
+  // --- call 2: tables and images, furthest first so indices stay valid ------
+  const structural = [
+    ...tables.map((t) => ({ offset: t.offset, kind: "table" as const, table: t.table })),
+    ...images.map((i) => ({ offset: i.offset, kind: "image" as const, url: i.url })),
+  ].sort((a, b) => b.offset - a.offset);
+
+  if (structural.length) {
+    await docsApi(token, `/${documentId}:batchUpdate`, {
+      requests: structural.map((el) =>
+        el.kind === "table"
+          ? {
+              insertTable: {
+                rows: el.table.rows.length + 1,
+                columns: el.table.headers.length,
+                location: { index: el.offset + 1 },
+              },
+            }
+          : {
+              insertInlineImage: {
+                location: { index: el.offset + 1 },
+                uri: el.url,
+                objectSize: {
+                  width: { magnitude: 468, unit: "PT" },
+                  height: { magnitude: 260, unit: "PT" },
+                },
+              },
+            },
+      ),
+    });
   }
 
-  if (spec.footer) {
-    await appendFooter(token, documentId, spec.footer);
+  // --- calls 3-5: fill every table cell in one pass -------------------------
+  if (tables.length) {
+    const doc = await docsApi(token, `/${documentId}`);
+    const content = (doc.body as { content: Record<string, unknown>[] }).content;
+    const found = content.filter((el) => "table" in el);
+    // Document order matches composition order.
+    const grids = tables.map((t) => [t.table.headers, ...t.table.rows]);
+
+    const fills: { index: number; text: string; header: boolean }[] = [];
+    found.forEach((element, tableIndex) => {
+      const grid = grids[tableIndex];
+      if (!grid) return;
+      const rows = (element.table as { tableRows: Record<string, unknown>[] }).tableRows;
+      rows.forEach((row, r) => {
+        const cells = (row as { tableCells: Record<string, unknown>[] }).tableCells;
+        cells.forEach((cell, c) => {
+          const para = (cell as { content: { startIndex: number }[] }).content[0];
+          const value = grid[r]?.[c] ?? "";
+          if (value && para) {
+            fills.push({ index: para.startIndex, text: value, header: r === 0 });
+          }
+        });
+      });
+    });
+
+    fills.sort((a, b) => b.index - a.index);
+    if (fills.length) {
+      await docsApi(token, `/${documentId}:batchUpdate`, {
+        requests: fills.map((f) => ({
+          insertText: { location: { index: f.index }, text: f.text },
+        })),
+      });
+      const headers = fills.filter((f) => f.header);
+      if (headers.length) {
+        await docsApi(token, `/${documentId}:batchUpdate`, {
+          requests: headers.map((f) => ({
+            updateTextStyle: {
+              range: { startIndex: f.index, endIndex: f.index + f.text.length },
+              textStyle: { bold: true },
+              fields: "bold",
+            },
+          })),
+        });
+      }
+    }
   }
 
   const url = `https://docs.google.com/document/d/${documentId}/edit`;
@@ -426,21 +413,3 @@ export async function exportToDocs(userId: string, spec: DocSpec): Promise<strin
   return url;
 }
 
-async function appendFooter(token: string, documentId: string, footer: string): Promise<void> {
-  const doc = await docsApi(token, `/${documentId}`);
-  const content = (doc.body as { content: { endIndex?: number }[] }).content;
-  const end = content[content.length - 1]?.endIndex ?? 1;
-  const at = Math.max(1, end - 1);
-  await docsApi(token, `/${documentId}:batchUpdate`, {
-    requests: [
-      { insertText: { location: { index: at }, text: `\n${footer}\n` } },
-      {
-        updateTextStyle: {
-          range: { startIndex: at, endIndex: at + footer.length + 1 },
-          textStyle: { italic: true, fontSize: { magnitude: 9, unit: "PT" } },
-          fields: "italic,fontSize",
-        },
-      },
-    ],
-  });
-}

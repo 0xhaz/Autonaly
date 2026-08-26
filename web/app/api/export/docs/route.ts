@@ -148,6 +148,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url });
   } catch (error) {
     const message = error instanceof Error ? error.message : "export failed";
+    // The Docs API's own explanation, which the generic UI message hides.
+    console.error("docs export failed:", message);
     const status = message.includes("not connected") ? 409 : 502;
     return NextResponse.json({ error: message }, { status });
   }
