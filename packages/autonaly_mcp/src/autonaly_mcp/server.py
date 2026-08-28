@@ -72,7 +72,7 @@ def _post(path: str, body: dict[str, Any]) -> dict:
 
 @mcp.tool()
 def list_commodity_baskets() -> str:
-    """The 22 modelled commodity baskets (grains, energy, fertilizers,
+    """The 24 modelled commodity baskets (grains, energy, fertilizers,
     critical minerals) with their HS6 codes and essentiality weights. Basket
     keys from here are the vocabulary every other tool speaks."""
     return json.dumps(_get("/baskets"))

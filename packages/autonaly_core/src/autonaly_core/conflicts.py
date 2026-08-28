@@ -149,7 +149,7 @@ CUSTOM_NOTE = (
 )
 
 CUSTOM_OMISSIONS = (
-    "Only the 22 modelled commodity baskets are visible: services, autos, "
+    "Only the 24 modelled commodity baskets are visible: services, autos, "
     "machinery, pharmaceuticals and most manufactures are not counted, so a "
     "crisis in a diversified manufacturing economy is understated here. No "
     "pipeline flows, no second-order effects, no substitution dynamics."
