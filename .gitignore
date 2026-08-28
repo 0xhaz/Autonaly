@@ -7,6 +7,7 @@ hackathon.md
 techstacks.md
 workplan.md
 demo-script.md
+scripts/demo_reset.py
 article/
 
 # secrets / env
