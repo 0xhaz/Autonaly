@@ -14,7 +14,12 @@ import pytest
 from autonaly_core.schema import Signal
 from autonaly_core.settings import Env, Settings
 from autonaly_ingest.injector import REPLAYS
-from autonaly_ingest.worker import PermanentFailure, handle
+from autonaly_ingest.worker import (
+    QUOTA_BACKOFF_SECONDS,
+    PermanentFailure,
+    handle,
+    is_rate_limited,
+)
 
 
 class FakeLedger:
@@ -59,6 +64,40 @@ class TestPydanticGate:
         with pytest.raises(PermanentFailure):
             handle(b"{}", {}, ledger)
         assert ledger.recorded == []
+
+
+class TestRateLimitIsNotAFailure:
+    """A rate-limited model used to cost the whole message.
+
+    A 429 nacked, Pub/Sub redelivered immediately, the retry re-ran the entire
+    agent against quota that was still exhausted, and five attempts burned in
+    nine minutes — dead-lettering a signal over a condition that clears itself
+    in about a minute. The classifier is what keeps 'not right now' apart from
+    'never'; getting it wrong in either direction breaks something.
+    """
+
+    def test_vertex_resource_exhausted_is_a_rate_limit(self):
+        assert is_rate_limited(RuntimeError("429 RESOURCE_EXHAUSTED. {'error': ...}"))
+
+    def test_an_error_carrying_a_429_code_is_a_rate_limit(self):
+        exc = RuntimeError("quota exceeded")
+        exc.code = 429
+        assert is_rate_limited(exc)
+
+    def test_an_ordinary_failure_is_not_a_rate_limit(self):
+        # Must nack promptly rather than sleeping through three backoffs.
+        assert not is_rate_limited(ConnectionError("engine unreachable"))
+        assert not is_rate_limited(ValueError("bad rankings payload"))
+
+    def test_a_malformed_signal_is_never_treated_as_a_rate_limit(self):
+        # The demo's dead-letter beat depends on this dead-lettering fast.
+        assert not is_rate_limited(PermanentFailure("2 validation errors"))
+
+    def test_backoffs_are_ordered_and_bounded(self):
+        # Long enough for a per-minute quota to refill, short enough that the
+        # message lease survives the wait.
+        assert list(QUOTA_BACKOFF_SECONDS) == sorted(QUOTA_BACKOFF_SECONDS)
+        assert sum(QUOTA_BACKOFF_SECONDS) < 600
 
 
 class TestIdempotency:

@@ -11,6 +11,7 @@ Failure handling, which is deliberate and visible:
   malformed signal   -> Pydantic gate rejects -> nack -> redelivered
                      -> after 5 attempts -> dead-letter topic
   duplicate signal   -> ledger hit -> acked as a no-op, agent never runs
+  model rate limit   -> waited out in place, without spending an attempt
   transient failure  -> nack -> redelivered -> succeeds or dead-letters
 """
 
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import UTC, datetime
 
 from autonaly_core import get_settings
@@ -63,6 +65,27 @@ class SignalLedger:
 
 class PermanentFailure(Exception):
     """A message that will never succeed — malformed, so let it dead-letter."""
+
+
+# Waited out inside the callback rather than by nacking. A nack redelivers
+# immediately, and the retry re-runs the whole agent — so a rate limit used to
+# spend all five delivery attempts in nine minutes, each attempt asking for
+# quota that was still exhausted, and the signal dead-lettered over a condition
+# that clears on its own in about a minute. Holding the message is safe: the
+# lease is extended while the callback runs, and handle() writes the ledger only
+# after the agent succeeds, so a retry re-runs from clean.
+QUOTA_BACKOFF_SECONDS = (45, 90, 180)
+
+
+def is_rate_limited(exc: BaseException) -> bool:
+    """Is this the model saying 'not right now' rather than 'never'?"""
+    text = str(exc)
+    return (
+        getattr(exc, "code", None) == 429
+        or "RESOURCE_EXHAUSTED" in text
+        or "429" in text
+        and "quota" in text.lower()
+    )
 
 
 def handle(data: bytes, attributes: dict[str, str], ledger: SignalLedger) -> dict:
@@ -118,14 +141,24 @@ def run_worker() -> None:
     def callback(message) -> None:  # noqa: ANN001 - pubsub message type
         attempt = message.delivery_attempt
         log.info("received message (delivery attempt %s)", attempt)
-        try:
-            handle(message.data, dict(message.attributes), ledger)
-            message.ack()
-        except PermanentFailure:
-            message.nack()
-        except Exception:
-            log.exception("transient failure, nacking for redelivery")
-            message.nack()
+        for wait in (*QUOTA_BACKOFF_SECONDS, None):
+            try:
+                handle(message.data, dict(message.attributes), ledger)
+                message.ack()
+                return
+            except PermanentFailure:
+                # Malformed. Retrying cannot help; let the subscription's
+                # dead-letter policy do its job.
+                message.nack()
+                return
+            except Exception as exc:
+                if is_rate_limited(exc) and wait is not None:
+                    log.warning("model rate limited, waiting %ss before retrying", wait)
+                    time.sleep(wait)
+                    continue
+                log.exception("transient failure, nacking for redelivery")
+                message.nack()
+                return
 
     print(f"\n  worker listening on {path}")
     print(f"  dead-letter topic: {topology['dlq_topic']}\n")
