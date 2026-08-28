@@ -127,11 +127,20 @@ export default function AboutPage() {
           written read — grounded in a curated century of supply crises, so your
           speculation arrives with its historical reference class: history
           doesn&apos;t repeat, but it rhymes. Save the scenario to your dashboard, and
-          export the brief as Markdown or straight into Google Docs — a
-          formatted document with headings, the exposure table and the
-          provenance footer, ready to edit. Reopening a saved
-          scenario replays it on the live engine — the numbers are reproducible,
-          not remembered.
+          take the brief with you — as Markdown, or as a real Google Doc written
+          into your own Drive. Reopening a saved scenario replays it on the live
+          engine — the numbers are reproducible, not remembered.
+        </p>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
+          The exported document is the whole analysis, not a summary of it: key
+          figures, the written read, and then every disruption channel as its own
+          section — the countries it reaches, what that exposure is worth against
+          their GDP, what the country at the centre of it stops earning, and who
+          gains — each with its own map. It closes with the historical reference
+          class, what the model does not see, and a glossary explaining every
+          measure, because a score nobody can interpret is not evidence. Autonaly
+          asks only for permission to create files, so it can write into your
+          Drive but cannot read anything already there.
         </p>
         <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
           The judgment stays yours. The desk deliberately refuses to say how likely

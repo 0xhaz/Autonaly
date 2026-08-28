@@ -219,7 +219,8 @@ tests/golden/          known-history regression suite
 | Artifacts | **GCS**, mounted as a volume | DuckDB reads plain files in both environments — see the seam note above |
 | Analytics | **DuckDB** over Parquet | 11.25M rows scanned in-process; no warehouse to operate |
 | Frontend | **Next.js 16** + **MapLibre GL** | Open-source map, no token fees; vendored dist to avoid a worker/bundler bug |
-| Auth | **Clerk** | Sessions for the personal analyst; Google Docs export uses its own narrow grant |
+| Auth | **Clerk** | Sessions for the personal analyst; the Docs export holds its own narrow grant |
+| Workspace | **Google Docs API** + `drive.file` | A briefing exports as a real document — per-channel maps, tables and a glossary — into the reader's Drive. The scope reaches only files this app created |
 | Agent interop | **MCP** | Eight tools over the same engine, so other agents can query it |
 
 ## Status
@@ -228,7 +229,7 @@ tests/golden/          known-history regression suite
 |---|---|
 | Event schema, ports, settings | working |
 | BACI refinery + quality gates | working |
-| Commodity baskets (22) + chokepoint routing | working |
+| Commodity baskets (24) + chokepoint routing | working |
 | Exposure engine + chokepoint route | working |
 | PortWatch observation + degradation guard | working |
 | ADK agent, sub-agents, and tools | working |
