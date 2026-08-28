@@ -151,8 +151,10 @@ CUSTOM_NOTE = (
 CUSTOM_OMISSIONS = (
     "Only the 24 modelled commodity baskets are visible: services, autos, "
     "machinery, pharmaceuticals and most manufactures are not counted, so a "
-    "crisis in a diversified manufacturing economy is understated here. No "
-    "pipeline flows, no second-order effects, no substitution dynamics."
+    "crisis in a diversified manufacturing economy is understated here. "
+    "Pipeline gas is counted as trade but not as network — the model sees the "
+    "flow, not the pipe, so it cannot tell you whether a route has an "
+    "alternative. No second-order effects, no substitution dynamics."
 )
 
 
