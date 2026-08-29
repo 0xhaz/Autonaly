@@ -3,7 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getBriefing } from "@/lib/firestore";
 import { serviceAuthHeaders } from "@/lib/serviceAuth";
-import { getPersonalReport, getProfile, savePersonalReport } from "@/lib/profile";
+import {
+  getPersonalReport,
+  getProfile,
+  savePersonalReport,
+  watchlistKey,
+} from "@/lib/profile";
 
 /**
  * Generate (or return the cached) personal impact note for one briefing.
@@ -26,7 +31,15 @@ export async function POST(request: NextRequest) {
 
   if (!force) {
     const cached = await getPersonalReport(userId, briefing_id);
-    if (cached) return NextResponse.json({ report: cached, cached: true });
+    if (cached) {
+      const current = await getProfile(userId);
+      // Unknown beats stale: notes written before the stamp existed carry no
+      // key, and calling those wrong would be a guess.
+      const stale = Boolean(
+        current && cached.watchlist_key && cached.watchlist_key !== watchlistKey(current),
+      );
+      return NextResponse.json({ report: cached, cached: true, stale });
+    }
   }
   if (peek) {
     // A look at the cache must never cost a generation — the card on mount
@@ -59,6 +72,7 @@ export async function POST(request: NextRequest) {
   const report = await savePersonalReport(userId, briefing_id, {
     narrative: result.narrative,
     provenance_verified: Boolean(result.provenance_verified),
+    watchlist_key: watchlistKey(profile),
   });
   return NextResponse.json({ report, cached: false });
 }

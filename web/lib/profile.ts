@@ -26,6 +26,29 @@ export interface PersonalReport {
   briefing_id: string;
   generated_at: string;
   provenance_verified: boolean;
+  /** The watchlist this note was written against. Absent on notes written
+   *  before notes recorded it — treated as unknown rather than stale, since
+   *  claiming a note is wrong when it may not be is its own error. */
+  watchlist_key?: string;
+}
+
+/**
+ * A stable fingerprint of what an analyst watches.
+ *
+ * A note is only true of the watchlist it was computed against: it names the
+ * commodities you follow and rules countries in or out by them. Editing the
+ * watchlist does not rewrite existing notes — they are cached per briefing —
+ * so without this a card goes on citing criteria you no longer hold, and looks
+ * for all the world like a setting that belongs to the card.
+ */
+export function watchlistKey(
+  profile: Pick<AnalystProfile, "baskets" | "countries" | "chokepoints">,
+): string {
+  return [
+    [...profile.baskets].sort().join(","),
+    [...profile.countries].sort().join(","),
+    [...profile.chokepoints].sort().join(","),
+  ].join("|");
 }
 
 function db() {

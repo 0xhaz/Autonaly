@@ -60,6 +60,7 @@ function renderNote(text: string) {
 }
 
 function EventCard({ briefing, autoGenerate }: { briefing: Briefing; autoGenerate?: boolean }) {
+  const [stale, setStale] = useState(false);
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +81,7 @@ function EventCard({ briefing, autoGenerate }: { briefing: Briefing; autoGenerat
       }
       const body = await response.json();
       setReport(body.report);
+      setStale(false);
     },
     [briefing.id],
   );
@@ -97,8 +99,10 @@ function EventCard({ briefing, autoGenerate }: { briefing: Briefing; autoGenerat
       .then((r) => (r.ok ? r.json() : null))
       .then((body) => {
         if (cancelled) return;
-        if (body?.cached) setReport(body.report);
-        else if (autoGenerate) void generate(false);
+        if (body?.cached) {
+          setReport(body.report);
+          setStale(Boolean(body.stale));
+        } else if (autoGenerate) void generate(false);
       })
       .catch(() => {});
     return () => {
@@ -125,13 +129,30 @@ function EventCard({ briefing, autoGenerate }: { briefing: Briefing; autoGenerat
           className="mt-3 rounded-md p-3"
           style={{ background: "var(--panel-2)", border: "1px solid var(--line)" }}
         >
+          {/* A note is only true of the watchlist it was written against. Say
+              so rather than letting it quietly describe commodities this desk
+              no longer follows. */}
+          {stale && (
+            <p
+              className="mb-2 rounded-md px-2.5 py-1.5 text-[11px]"
+              style={{
+                color: "var(--warn)",
+                background: "color-mix(in srgb, var(--warn) 10%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--warn) 35%, transparent)",
+              }}
+            >
+              Written against an earlier watchlist — regenerate to read this event
+              against what you watch now.
+            </p>
+          )}
           {renderNote(report.narrative)}
           <div className="mt-3 flex items-center justify-between">
             <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
               {report.provenance_verified ? "every figure engine-verified" : "unverified"}
             </span>
             <button type="button" onClick={() => generate(true)} disabled={loading}
-              className="text-[11px]" style={{ color: "var(--muted)" }}>
+              className="text-[11px]"
+              style={{ color: stale ? "var(--warn)" : "var(--muted)", fontWeight: stale ? 600 : 400 }}>
               {loading ? "regenerating…" : "regenerate"}
             </button>
           </div>
@@ -367,22 +388,18 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
                 ))}
           </p>
         </div>
-        {/* The desk brings you events; a scenario is the thing you start
-            yourself, so it gets the header's one action. Named for where it
-            goes — "New research" read as "define what this analyst
-            researches", and sent people to the wrong page. Editing the
-            watchlist lives beside the reads it governs, further down. */}
-        <Link
-          href={
-            profile.chokepoints.length
-              ? `/simulate?chokepoint=${profile.chokepoints[0]}`
-              : "/simulate"
-          }
+        {/* Research starts by saying what this desk is for, so the header's
+            action opens the builder. Edit watchlist reaches the same place from
+            beside the reads it governs — same destination, two moments: setting
+            the remit, and adjusting it once you can see what it produced. */}
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
           className="rounded-md px-3 py-1.5 text-xs font-semibold"
           style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
         >
-          New scenario
-        </Link>
+          New research
+        </button>
       </header>
 
       <GoogleDocsCard />
@@ -409,12 +426,20 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
         <p className="-mt-1 text-xs" style={{ color: "var(--muted)" }}>
           Briefings the desk has filed from incoming signals, each read against
           your watchlist. These arrive on their own — to ask a question of your
-          own, run a new scenario.
+          own, run one in the{" "}
+          <Link href="/simulate" style={{ color: "var(--accent)" }}>
+            simulator
+          </Link>
+          .
         </p>
         {briefings.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--muted)" }}>
             No events on the desk yet. Your analyst reads them as they arrive —
-            meanwhile, run a scenario of your own.
+            meanwhile, run one yourself in the{" "}
+            <Link href="/simulate" style={{ color: "var(--accent)" }}>
+              simulator
+            </Link>
+            .
           </p>
         ) : (
           briefings.map((b, i) => (
