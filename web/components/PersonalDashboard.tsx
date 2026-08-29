@@ -367,11 +367,27 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
                 ))}
           </p>
         </div>
-        <button type="button" onClick={() => setEditing(true)}
-          className="rounded-md px-3 py-1.5 text-xs"
-          style={{ border: "1px solid var(--line)", color: "var(--muted)" }}>
-          Edit watchlist
-        </button>
+        {/* The desk brings you events; research is the thing you start
+            yourself, so it gets the primary action. Without it the only route
+            out of this page was a link inside a paragraph. */}
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setEditing(true)}
+            className="rounded-md px-3 py-1.5 text-xs"
+            style={{ border: "1px solid var(--line)", color: "var(--muted)" }}>
+            Edit watchlist
+          </button>
+          <Link
+            href={
+              profile.chokepoints.length
+                ? `/simulate?chokepoint=${profile.chokepoints[0]}`
+                : "/simulate"
+            }
+            className="rounded-md px-3 py-1.5 text-xs font-semibold"
+            style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+          >
+            New research
+          </Link>
+        </div>
       </header>
 
       <GoogleDocsCard />
@@ -386,15 +402,14 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
         </h2>
         <p className="-mt-1 text-xs" style={{ color: "var(--muted)" }}>
           Briefings the desk has filed from incoming signals, each read against
-          your watchlist. To drive a scenario of your own — a strait you watch,
-          a country you suspect — use the{" "}
-          <Link href="/simulate" style={{ color: "var(--accent)" }}>
-            simulator
-          </Link>
-          .
+          your watchlist. These arrive on their own — to ask a question of your
+          own, start new research.
         </p>
         {briefings.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--muted)" }}>No events on the desk.</p>
+          <p className="text-sm" style={{ color: "var(--muted)" }}>
+            No events on the desk yet. Your analyst reads them as they arrive —
+            meanwhile, start your own research.
+          </p>
         ) : (
           briefings.map((b, i) => (
             <EventCard key={b.id} briefing={b} autoGenerate={justHired && i === 0} />
