@@ -99,8 +99,16 @@ export default async function BriefingPage({
             background: "color-mix(in srgb, var(--warn) 8%, transparent)",
           }}
         >
+          {/* A review note means two different things, and saying the wrong one
+              undermines the page it sits on. Where the agent refused to score,
+              this is the refusal and its reason. Where it scored anyway, it is
+              a caveat on a figure the same page displays — announcing "severity
+              not computed" above a briefing headed "severity: observed" reads
+              as a system that cannot keep its own story straight. */}
           <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--warn)" }}>
-            Data-quality warning — severity not computed
+            {rankings
+              ? "Data-quality note — read before approving"
+              : "Data-quality warning — severity not computed"}
           </p>
           <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
             {briefing.review_note}
