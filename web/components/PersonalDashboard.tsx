@@ -367,9 +367,10 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
                 ))}
           </p>
         </div>
-        {/* The desk brings you events; research is the thing you start
-            yourself, so it gets the primary action. Without it the only route
-            out of this page was a link inside a paragraph. */}
+        {/* The desk brings you events; a scenario is the thing you start
+            yourself, so it gets the primary action. Named for where it goes —
+            "New research" read as "define what this analyst researches", which
+            is what Edit watchlist does, and sent people to the wrong page. */}
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => setEditing(true)}
             className="rounded-md px-3 py-1.5 text-xs"
@@ -385,7 +386,7 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
             className="rounded-md px-3 py-1.5 text-xs font-semibold"
             style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
           >
-            New research
+            New scenario
           </Link>
         </div>
       </header>
@@ -403,12 +404,12 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
         <p className="-mt-1 text-xs" style={{ color: "var(--muted)" }}>
           Briefings the desk has filed from incoming signals, each read against
           your watchlist. These arrive on their own — to ask a question of your
-          own, start new research.
+          own, run a new scenario.
         </p>
         {briefings.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--muted)" }}>
             No events on the desk yet. Your analyst reads them as they arrive —
-            meanwhile, start your own research.
+            meanwhile, run a scenario of your own.
           </p>
         ) : (
           briefings.map((b, i) => (
