@@ -1052,11 +1052,18 @@ export default function Simulator() {
                   style={selectStyle}
                 >
                   <option value="">Add a country…</option>
+                  {/* The engine names countries as the World Bank does, which
+                      is not what the rest of the app calls them or what anyone
+                      types: someone hunting South Korea will not find "Korea,
+                      Rep." filed under K. Sorted by what is displayed, because
+                      renaming moves a country in the alphabet. */}
                   {customCountries
                     .filter((c) => !customPicked.includes(c.iso3))
+                    .map((c) => ({ ...c, label: countryNames[c.iso3] ?? c.name }))
+                    .sort((a, b) => a.label.localeCompare(b.label))
                     .map((c) => (
                       <option key={c.iso3} value={c.iso3}>
-                        {c.name} · {c.material_baskets} basket{c.material_baskets === 1 ? "" : "s"}
+                        {c.label} · {c.material_baskets} basket{c.material_baskets === 1 ? "" : "s"}
                       </option>
                     ))}
                 </select>

@@ -87,6 +87,8 @@ def main() -> int:
 # geojson's tidier names (e.g. "South Korea" over "Korea, Rep.") winning where
 # both exist, plus explicit cleanups for the World Bank's official long forms.
 WDI_NAME_CLEANUPS = {
+    "CHN": "China",
+    "USA": "United States",
     "HKG": "Hong Kong",
     "MAC": "Macao",
     "SGP": "Singapore",
@@ -121,6 +123,12 @@ def write_country_names(features: list[dict]) -> None:
         }
     for f in features:
         names[f["properties"]["iso3"]] = f["properties"]["name"]
+
+    # Curated names last, so they win over both sources. They used to be applied
+    # first and the polygon names then overwrote them, which is how a country
+    # picker ended up offering "Korea, Rep." to people looking for South Korea,
+    # and "People's Republic of China" filed under P.
+    names.update({iso3: name for iso3, name in WDI_NAME_CLEANUPS.items() if iso3 in names})
 
     out = REPO_ROOT / "web/public/country-names.json"
     out.write_text(json.dumps(names, separators=(",", ":"), sort_keys=True), encoding="utf-8")
