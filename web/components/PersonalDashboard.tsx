@@ -368,27 +368,21 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
           </p>
         </div>
         {/* The desk brings you events; a scenario is the thing you start
-            yourself, so it gets the primary action. Named for where it goes —
-            "New research" read as "define what this analyst researches", which
-            is what Edit watchlist does, and sent people to the wrong page. */}
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setEditing(true)}
-            className="rounded-md px-3 py-1.5 text-xs"
-            style={{ border: "1px solid var(--line)", color: "var(--muted)" }}>
-            Edit watchlist
-          </button>
-          <Link
-            href={
-              profile.chokepoints.length
-                ? `/simulate?chokepoint=${profile.chokepoints[0]}`
-                : "/simulate"
-            }
-            className="rounded-md px-3 py-1.5 text-xs font-semibold"
-            style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
-          >
-            New scenario
-          </Link>
-        </div>
+            yourself, so it gets the header's one action. Named for where it
+            goes — "New research" read as "define what this analyst
+            researches", and sent people to the wrong page. Editing the
+            watchlist lives beside the reads it governs, further down. */}
+        <Link
+          href={
+            profile.chokepoints.length
+              ? `/simulate?chokepoint=${profile.chokepoints[0]}`
+              : "/simulate"
+          }
+          className="rounded-md px-3 py-1.5 text-xs font-semibold"
+          style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+        >
+          New scenario
+        </Link>
       </header>
 
       <GoogleDocsCard />
@@ -398,9 +392,20 @@ export default function PersonalDashboard({ briefings }: { briefings: Briefing[]
       <SavedScenarios />
 
       <section className="space-y-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
-          Current events · your analyst&apos;s read
-        </h2>
+        {/* This is where the watchlist shows its work — every note below is the
+            criteria applied to an event — so it is where you change it. In the
+            header it sat next to New scenario and read as a second way to start
+            something, rather than a way to adjust what already runs. */}
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+            Current events · your analyst&apos;s read
+          </h2>
+          <button type="button" onClick={() => setEditing(true)}
+            className="shrink-0 rounded-md px-3 py-1.5 text-xs"
+            style={{ border: "1px solid var(--line)", color: "var(--muted)" }}>
+            Edit watchlist
+          </button>
+        </div>
         <p className="-mt-1 text-xs" style={{ color: "var(--muted)" }}>
           Briefings the desk has filed from incoming signals, each read against
           your watchlist. These arrive on their own — to ask a question of your
