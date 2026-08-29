@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   COMMODITY_GROUPS,
@@ -73,8 +73,63 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
   const [chokes, setChokes] = useState<Set<string>>(new Set(initial?.chokepoints ?? []));
   const [countryQuery, setCountryQuery] = useState("");
   const [allStraits, setAllStraits] = useState<string[]>([]);
+  // What a country pulled in, so a chip can say why it is lit and the reader
+  // can tell a suggestion from something they chose.
+  const [derived, setDerived] = useState<Set<string>>(new Set());
+  const [deriving, setDeriving] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Adding a country lights up what it actually trades.
+   *
+   * Nobody picking a watchlist knows Taiwan's imports are a fifth
+   * semiconductors, or which straits its cargo crosses — asking for
+   * commodities first made you guess, and a guess here quietly narrows every
+   * briefing that follows. The country's own trade profile knows, so it fills
+   * the other two sections in and you take things away instead.
+   *
+   * Only ever adds. Removing a country leaves the selection alone, because by
+   * then you may want those commodities for their own sake, and silently
+   * dropping them would be the same guess in the other direction.
+   */
+  const deriveFrom = useCallback(
+    async (iso3: string) => {
+      setDeriving(iso3);
+      try {
+        // The basket argument only shapes the exposure figures, which this does
+        // not read; the trade profile and straits come back the same whatever
+        // is passed.
+        const res = await fetch(`/api/country/${iso3}?baskets=wheat&top_n=1`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const economy = data.economy ?? {};
+        const material = [
+          ...(economy.top_import_baskets ?? []),
+          ...(economy.top_export_baskets ?? []),
+        ]
+          // The same 1%-of-trade floor the simulator uses to decide a country
+          // has a defensible story in a basket at all.
+          .filter((b: { share_of_trade: number }) => b.share_of_trade >= 0.01)
+          .map((b: { basket: string }) => b.basket);
+
+        const watchable = new Set((meta?.chokepoints ?? []).map((c) => c.key));
+        const straits = ((data.chokepoints ?? []) as { key: string }[])
+          .map((c) => c.key)
+          .filter((k) => watchable.has(k));
+
+        if (material.length === 0 && straits.length === 0) return;
+        setBaskets((prev) => new Set([...prev, ...material]));
+        setChokes((prev) => new Set([...prev, ...straits]));
+        setDerived((prev) => new Set([...prev, ...material, ...straits]));
+      } catch {
+        // A watchlist you fill in yourself is still a watchlist.
+      } finally {
+        setDeriving(null);
+      }
+    },
+    [meta],
+  );
 
   useEffect(() => {
     fetch("/api/meta").then((r) => r.json()).then(setMeta).catch(() => {});
@@ -219,37 +274,18 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
 
       <section className="panel space-y-2 p-4">
         <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
-          Commodities · {baskets.size} watched
-        </label>
-        <div className="space-y-2.5 pt-1">
-          {COMMODITY_GROUPS.map((group) => {
-            const inGroup = (meta?.baskets ?? []).filter(
-              (b) => b.essentiality === group.key,
-            );
-            if (inGroup.length === 0) return null;
-            return (
-              <div key={group.key}>
-                <div className="mb-1 text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
-                  {group.label}
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {inGroup.map((b) => (
-                    <button key={b.key} type="button" onClick={() => toggle(baskets, setBaskets, b.key)}
-                      className="rounded-full px-2.5 py-1 text-xs" style={chip(baskets.has(b.key))}>
-                      {b.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="panel space-y-2 p-4">
-        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
           Countries · {watched.size} watched
         </label>
+        <p className="text-[11px]" style={{ color: "var(--muted)" }}>
+          Start here. Adding a country lights up the commodities it materially
+          trades and the straits its cargo crosses, below — deselect anything you
+          do not want in your briefings.
+          {deriving && (
+            <span style={{ color: "var(--accent)" }}>
+              {" "}Reading {countryName[deriving] ?? deriving}&apos;s trade profile…
+            </span>
+          )}
+        </p>
         <div className="flex flex-wrap gap-1.5">
           {[...watched].map((iso3) => (
             <button key={iso3} type="button" onClick={() => toggle(watched, setWatched, iso3)}
@@ -269,13 +305,56 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
           <div className="flex flex-wrap gap-1.5">
             {matches.map((c) => (
               <button key={c.iso3} type="button"
-                onClick={() => { toggle(watched, setWatched, c.iso3); setCountryQuery(""); }}
+                onClick={() => {
+                  toggle(watched, setWatched, c.iso3);
+                  setCountryQuery("");
+                  if (!watched.has(c.iso3)) void deriveFrom(c.iso3);
+                }}
                 className="rounded-full px-2.5 py-1 text-xs" style={chip(false)}>
                 {c.name} <span className="mono">{c.iso3}</span>
               </button>
             ))}
           </div>
         )}
+      </section>
+
+      <section className="panel space-y-2 p-4">
+        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          Commodities · {baskets.size} watched
+        </label>
+        {derived.size > 0 && (
+          <p className="text-[11px]" style={{ color: "var(--muted)" }}>
+            A dot marks something a watched country brought in. Deselect what you
+            do not want.
+          </p>
+        )}
+        <div className="space-y-2.5 pt-1">
+          {COMMODITY_GROUPS.map((group) => {
+            const inGroup = (meta?.baskets ?? []).filter(
+              (b) => b.essentiality === group.key,
+            );
+            if (inGroup.length === 0) return null;
+            return (
+              <div key={group.key}>
+                <div className="mb-1 text-[10px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+                  {group.label}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {inGroup.map((b) => (
+                    <button key={b.key} type="button" onClick={() => toggle(baskets, setBaskets, b.key)}
+                      title={derived.has(b.key) ? "Selected because a country you watch materially trades this" : undefined}
+                      className="rounded-full px-2.5 py-1 text-xs" style={chip(baskets.has(b.key))}>
+                      {b.label}
+                      {derived.has(b.key) && baskets.has(b.key) && (
+                        <span aria-hidden style={{ opacity: 0.65 }}> ·</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <section className="panel space-y-2 p-4">
@@ -302,8 +381,12 @@ export default function AnalystBuilder({ initial, onSaved }: Props) {
                 <div className="flex flex-wrap gap-1.5">
                   {modelled.map((c) => (
                     <button key={c.key} type="button" onClick={() => toggle(chokes, setChokes, c.key)}
+                      title={derived.has(c.key) ? "Selected because a country you watch ships through it" : undefined}
                       className="rounded-full px-2.5 py-1 text-xs" style={chip(chokes.has(c.key))}>
                       {c.label}
+                      {derived.has(c.key) && chokes.has(c.key) && (
+                        <span aria-hidden style={{ opacity: 0.65 }}> ·</span>
+                      )}
                     </button>
                   ))}
                   {pending.map((name) => (
