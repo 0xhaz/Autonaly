@@ -126,3 +126,39 @@ class TestObservationBacking:
         # The exact failure the escalation path exists to prevent.
         data = {"observation": {"baseline_mean_per_day": 11.21, "event_mean_per_day": 8.42}}
         assert unbacked_numerals("Severity is approximately 90.5%.", data) == {"90.5"}
+
+
+class TestBriefingIdsAreUrlSafe:
+    """A briefing nobody can open is not filed, whatever Firestore says.
+
+    The event key is written by the model, and one Suez run reached for the
+    signal's source and produced `replay:2021-suez`. The record was intact and
+    /briefing/replay:2021-suez returned 404 — a leading `replay:` reads as a URI
+    scheme, encoded or not.
+    """
+
+    def test_a_colon_key_becomes_reachable(self):
+        from autonaly_agent.tools import record_id_for
+
+        assert record_id_for("replay:2021-suez") == "replay-2021-suez"
+
+    def test_ordinary_slugs_are_left_alone(self):
+        from autonaly_agent.tools import record_id_for
+
+        for key in ("bosporus-2026-08-10", "suez-blockage-2021-03-23"):
+            assert record_id_for(key) == key
+
+    def test_the_id_is_deterministic_so_duplicates_still_overwrite(self):
+        from autonaly_agent.tools import record_id_for
+
+        assert record_id_for("replay:2021-suez") == record_id_for("replay:2021-suez")
+
+    def test_nothing_firestore_rejects_survives(self):
+        from autonaly_agent.tools import record_id_for
+
+        for key in ("a/b", "  spaced  key  ", "__weird__", "..", "Mixed:CASE/Key"):
+            got = record_id_for(key)
+            assert got, f"{key!r} produced an empty id"
+            assert "/" not in got
+            assert got == got.strip("-")
+            assert not got.startswith("__")

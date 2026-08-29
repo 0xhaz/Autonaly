@@ -543,6 +543,25 @@ def compose_briefing(
 # --------------------------------------------------------------------------
 
 
+_UNSAFE_IN_A_URL = re.compile(r"[^a-z0-9]+")
+
+
+def record_id_for(event_key: str) -> str:
+    """A briefing id that survives being put in a URL.
+
+    The key is written by the model, and it does not always produce a slug: one
+    Suez run reached for the signal's source and filed `replay:2021-suez`. The
+    record was perfect and the page was unreachable — a leading `replay:` reads
+    as a URI scheme, so /briefing/replay:2021-suez resolves to nothing whether
+    the colon is encoded or not.
+
+    Deterministic, so idempotency is unaffected: the same event key still maps
+    to the same document, and a duplicate signal still overwrites.
+    """
+    slug = _UNSAFE_IN_A_URL.sub("-", event_key.strip().lower()).strip("-")
+    return (slug or "briefing")[:120]
+
+
 def submit_for_review(
     event_key: str,
     title: str,
@@ -577,7 +596,9 @@ def submit_for_review(
 
     scored = bool(rankings)
     record = BriefingRecord(
-        id=event_key,
+        # The id has to be URL-safe; the key it came from is kept as written,
+        # since that is what the agent decided this event was.
+        id=record_id_for(event_key),
         event_key=event_key,
         title=title,
         status=BriefingStatus.PENDING,
