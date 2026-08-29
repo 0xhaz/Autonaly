@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { approve, reject } from "@/app/actions";
+import BriefingExport from "@/components/BriefingExport";
 import BriefingWorkspace from "@/components/BriefingWorkspace";
 import CiteLine from "@/components/CiteLine";
 import { getBriefing } from "@/lib/firestore";
@@ -83,10 +84,24 @@ export default async function BriefingPage({
           )}
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">{briefing.title}</h1>
-        <p className="mono text-xs" style={{ color: "var(--muted)" }}>
-          {briefing.event_key}
-          {rankings ? ` · severity: ${rankings.severity_label} · methodology ${rankings.methodology_version}` : ""}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="mono text-xs" style={{ color: "var(--muted)" }}>
+            {briefing.event_key}
+            {rankings ? ` · severity: ${rankings.severity_label} · methodology ${rankings.methodology_version}` : ""}
+          </p>
+          {/* The desk's own output was the one thing that could not leave the
+              page — every exported document was a hypothetical the reader had
+              built themselves. */}
+          <BriefingExport
+            title={briefing.title}
+            narrative={briefing.narrative}
+            rankings={rankings}
+            reviewNote={briefing.review_note}
+            scoring={briefing.scoring}
+            status={briefing.status}
+            eventKey={briefing.event_key}
+          />
+        </div>
       </header>
 
       <AgentTrailStrip trail={briefing.trail} />

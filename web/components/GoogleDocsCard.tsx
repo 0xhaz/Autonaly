@@ -54,7 +54,7 @@ export default function GoogleDocsCard() {
         <h2 className="text-sm font-semibold">Google Docs</h2>
         <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
           {state === "ready"
-            ? "Desk briefs export as formatted documents — headings, an exposure table, and the provenance footer."
+            ? "Briefings and scenarios export as formatted documents — the narrative, the exposure map, the ranked table and a glossary."
             : "Connect once to export desk briefs straight into your Drive."}{" "}
           Autonaly can only touch documents it creates.
           {flash && <span style={{ color: "var(--ok)" }}> {flash}</span>}
