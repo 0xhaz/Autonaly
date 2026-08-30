@@ -65,7 +65,7 @@ export default async function BriefingPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <Link href="/" className="text-sm" style={{ color: "var(--accent)" }}>
+      <Link href="/review" className="text-sm" style={{ color: "var(--accent)" }}>
         ← review queue
       </Link>
 

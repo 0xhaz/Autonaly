@@ -11,12 +11,14 @@ import { approveBriefing, rejectBriefing } from "@/lib/firestore";
 
 export async function approve(id: string) {
   await approveBriefing(id);
-  revalidatePath("/");
+  // The queue moved to /review; revalidating "/" refreshed the atlas, which
+  // does not list briefings, and left the queue itself alone.
+  revalidatePath("/review");
   revalidatePath(`/briefing/${id}`);
 }
 
 export async function reject(id: string) {
   await rejectBriefing(id);
-  revalidatePath("/");
+  revalidatePath("/review");
   revalidatePath(`/briefing/${id}`);
 }
