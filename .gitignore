@@ -10,8 +10,10 @@ techstacks*.md
 workplan*.md
 demo-script*.md
 devpost-*.md
-autonaly-thumbnail.png
-autonaly-architecture.png
+# The working copies at the repo root stay out; docs/ holds the
+# committed versions the README renders.
+/autonaly-thumbnail.png
+/autonaly-architecture.png
 scripts/demo_reset*.py
 article/
 

@@ -1,5 +1,7 @@
 # Autonaly
 
+![Autonaly — when physical supply breaks, who gets hurt and how badly](docs/banner.png)
+
 **An autonomous crisis-impact analyst.** A raw signal arrives — a canal blocked, a strait
 threatened, an export ban announced. The agent classifies the event, routes it to the right
 data sources, computes country-level trade exposure with a deterministic engine, drafts a
@@ -36,6 +38,10 @@ is the only dependency with no local substitute. You can therefore run this on a
 ---
 
 ## Architecture
+
+![Autonaly architecture — a signal is routed by Gemini, computed by a deterministic engine, and approved by a human](docs/architecture.png)
+
+The same thing in source form, which is what gets maintained:
 
 ```mermaid
 flowchart TB
