@@ -181,7 +181,7 @@ rather than guessing.
 ### Tests
 
 ```bash
-make test    # 208 tests
+make test    # 222 tests
 ```
 
 The suite runs offline. Unit tests use in-memory fakes; PortWatch tests read snapshotted
