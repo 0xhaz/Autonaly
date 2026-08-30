@@ -91,6 +91,19 @@ export const GLOSSARY: GlossaryEntry[] = [
       "a cutoff. For real events severity is measured from observed vessel transits, never assumed.",
   },
   {
+    term: "Computed vs curated",
+    short:
+      "Computed: the engine scored it. Curated: it refused to, and says why — a judgement, not a failure.",
+    full:
+      "Every briefing carries one of these. Computed means the deterministic engine produced " +
+      "rankings: countries, dependency ratios, dollars at risk. Curated means it did not, and the " +
+      "briefing carries the reason instead of a number. That happens when severity cannot be " +
+      "established honestly — a vessel-transit baseline that is itself degraded, or an event whose " +
+      "mechanism is invisible in customs data, such as a banking crisis. A curated briefing is not a " +
+      "failed one: the written analysis is there, and so is a statement of what would change the " +
+      "answer. It is the desk declining to publish a figure it cannot defend.",
+  },
+  {
     term: "Essentiality",
     short: "A fixed weight per commodity class — staples and energy weigh most.",
     full:

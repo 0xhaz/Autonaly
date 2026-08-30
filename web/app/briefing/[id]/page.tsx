@@ -7,6 +7,7 @@ import BriefingExport from "@/components/BriefingExport";
 import BriefingWorkspace from "@/components/BriefingWorkspace";
 import CiteLine from "@/components/CiteLine";
 import { getBriefing } from "@/lib/firestore";
+import { GLOSSARY_SHORT } from "@/lib/glossary";
 import { formatPercent } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -71,7 +72,12 @@ export default async function BriefingPage({
       <header className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`chip chip-${briefing.status}`}>{briefing.status}</span>
-          <span className={`chip chip-${briefing.scoring}`}>{briefing.scoring}</span>
+          <span
+            className={`chip chip-${briefing.scoring}`}
+            title={GLOSSARY_SHORT["Computed vs curated"]}
+          >
+            {briefing.scoring}
+          </span>
           {briefing.draft?.route && (
             <span className="chip" style={{ color: "var(--muted)" }}>
               route: {briefing.draft.route}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { listBriefings } from "@/lib/firestore";
+import { GLOSSARY_SHORT } from "@/lib/glossary";
 import type { Briefing } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,12 @@ function Row({ briefing }: { briefing: Briefing }) {
       <article className="panel p-4 transition-colors hover:border-[color:var(--accent)]">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={`chip chip-${briefing.status}`}>{briefing.status}</span>
-          <span className={`chip chip-${briefing.scoring}`}>{briefing.scoring}</span>
+          <span
+            className={`chip chip-${briefing.scoring}`}
+            title={GLOSSARY_SHORT["Computed vs curated"]}
+          >
+            {briefing.scoring}
+          </span>
           {briefing.draft?.route && (
             <span className="chip" style={{ color: "var(--muted)" }}>{briefing.draft.route}</span>
           )}
